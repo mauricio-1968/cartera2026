@@ -509,12 +509,23 @@ const app = {
     tbody.innerHTML = html;
   },
 
-  switchTab(tabName) {
+  switchTab(tabName, evt) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('section[id^="tab-"]').forEach(sec => sec.style.display = 'none');
 
-    document.getElementById(`tab-${tabName}`).style.display = 'block';
-    event.target.classList.add('active');
+    const targetSec = document.getElementById(`tab-${tabName}`);
+    if (targetSec) targetSec.style.display = 'block';
+
+    if (evt && evt.target) {
+      evt.target.classList.add('active');
+    } else {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        const onClickAttr = btn.getAttribute('onclick') || '';
+        if (onClickAttr.includes(`'${tabName}'`)) {
+          btn.classList.add('active');
+        }
+      });
+    }
   },
 
   calcBuyQty() {

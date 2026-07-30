@@ -61,10 +61,10 @@
 
     <!-- NAV TABS -->
     <nav class="nav-tabs">
-      <button class="tab-btn active" onclick="app.switchTab('dashboard')">📊 Tablero Principal</button>
-      <button class="tab-btn" onclick="app.switchTab('open')">🟢 Posiciones Abiertas (<span id="count-open">0</span>)</button>
-      <button class="tab-btn" onclick="app.switchTab('closed')">🔴 Histórico de Ventas (<span id="count-closed">0</span>)</button>
-      <button class="tab-btn" onclick="app.switchTab('import')">📂 Importar Excel / Respaldos</button>
+      <button class="tab-btn active" onclick="app.switchTab('dashboard', event)">📊 Tablero Principal</button>
+      <button class="tab-btn" onclick="app.switchTab('open', event)">🟢 Posiciones Abiertas (<span id="count-open">0</span>)</button>
+      <button class="tab-btn" onclick="app.switchTab('closed', event)">🔴 Histórico de Ventas (<span id="count-closed">0</span>)</button>
+      <button class="tab-btn" onclick="app.switchTab('import', event)">📂 Importar Excel / Respaldos</button>
     </nav>
 
     <!-- TAB 1: DASHBOARD -->
