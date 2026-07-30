@@ -1,0 +1,21 @@
+{
+  "short_name": "CarteraAcciones",
+  "name": "Administrador de Cartera de Acciones - EE.UU.",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2485/2485248.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2485/2485248.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0b0f19",
+  "theme_color": "#10b981",
+  "display": "standalone",
+  "orientation": "any"
+}

@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gestión de Cartera de Acciones EE.UU. | Trading & Portafolio</title>
+  
+  <!-- Manifest PWA para Tablet Android -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#10b981">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Font & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="/css/styles.css">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="header-top">
+      <div class="brand">
+        <div class="brand-icon">📈</div>
+        <div>
+          <div class="brand-title">Cartera de Acciones <span class="brand-badge">Bolsa EE.UU.</span></div>
+          <div class="brand-author">Desarrollado por <strong>Mauricio Martinez</strong></div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-secondary" onclick="app.refreshData()">
+          <span id="refresh-spinner">🔄</span> Actualizar Precios
+        </button>
+        <button class="btn btn-primary" onclick="app.openBuyModal()">
+          ➕ Nueva Compra
+        </button>
+        <!-- BOTÓN DE VENTA DESTACADO Y SIEMPRE VISIBLE -->
+        <button class="btn btn-success" onclick="app.openSellModalFromHeader()">
+          💵 Vender Acción
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="main-container">
+
+    <!-- NAV TABS -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" onclick="app.switchTab('dashboard')">📊 Tablero Principal</button>
+      <button class="tab-btn" onclick="app.switchTab('open')">🟢 Posiciones Abiertas (<span id="count-open">9</span>)</button>
+      <button class="tab-btn" onclick="app.switchTab('closed')">🔴 Histórico de Ventas (<span id="count-closed">21</span>)</button>
+      <button class="tab-btn" onclick="app.switchTab('import')">📂 Importar Excel / Respaldos</button>
+    </nav>
+
+    <!-- TAB 1: DASHBOARD -->
+    <section id="tab-dashboard">
+      <!-- Stat Cards -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-title">Valor Total Cartera</span>
+            <span class="stat-icon">💰</span>
+          </div>
+          <div class="stat-value" id="stat-total-val">$0.00</div>
+          <div class="stat-sub" id="stat-total-sub">
+            Cargando...
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-title">Ganancia Flotante (No Realizada)</span>
+            <span class="stat-icon">📈</span>
+          </div>
+          <div class="stat-value" id="stat-unrealized">$0.00</div>
+          <div class="stat-sub" id="stat-unrealized-sub">
+            Posiciones Abiertas
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-title">Ganancia Realizada (Ventas)</span>
+            <span class="stat-icon">💵</span>
+          </div>
+          <div class="stat-value text-success" id="stat-realized">$0.00</div>
+          <div class="stat-sub text-success" id="stat-realized-sub">
+            +18.0% Retorno Cerrado
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-title">Efectividad (Win Rate)</span>
+            <span class="stat-icon">🏆</span>
+          </div>
+          <div class="stat-value" id="stat-winrate">90.5%</div>
+          <div class="stat-sub" id="stat-winrate-sub">
+            19 de 21 ventas ganadoras
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard Layout con Ticker Vertical -->
+      <div class="dashboard-layout">
+        <!-- Columna Izquierda: Gráfico Lineal Intradiario y Noticias -->
+        <div class="dashboard-left">
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <span>📈 Evolución Intradiaria del Precio (Cada 30 min - Hoy)</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-size: 12px; color: var(--text-muted);">Acción:</label>
+                <select id="chart-stock-select" class="form-input" style="padding: 4px 10px; font-size: 13px; width: auto; font-weight: bold;" onchange="app.changeIntradaySymbol(this.value)">
+                  <!-- Opciones dinámicas de posiciones abiertas -->
+                </select>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="chart-intraday-line"></canvas>
+            </div>
+          </div>
+
+          <!-- REEMPLAZADO: SECCIÓN DE NOTICIAS EN VIVO DE TUS ACCIONES -->
+          <div class="card">
+            <div class="card-title">
+              <span>📰 Noticias & Novedades Bursátiles (Tus Posiciones)</span>
+              <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);">Actualizado en vivo</span>
+            </div>
+            <div class="news-feed-container" id="news-feed-container">
+              <div style="text-align: center; color: var(--text-muted); padding: 20px;">Cargando últimas noticias de tus acciones...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna Derecha: BARRA DE ACCIONES VERTICAL -->
+        <div class="dashboard-right">
+          <div class="card">
+            <div class="card-title">
+              <span>📱 Cotizaciones en Vivo (Lista Vertical)</span>
+              <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);">Bolsa EE.UU.</span>
+            </div>
+            <div class="vertical-ticker-list" id="vertical-ticker-list">
+              <!-- Renderizado vertical de tickers -->
+              <div class="ticker-loading">Cargando cotizaciones...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: POSICIONES ABIERTAS -->
+    <section id="tab-open" style="display: none;">
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>🟢 Posiciones Activas en Cartera (Cotizaciones en Tiempo Real)</span>
+          <button class="btn btn-success" onclick="app.openSellModalFromHeader()" style="padding: 6px 14px; font-size: 13px;">
+            💵 Vender una Acción
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ticker / Acción</th>
+                <th>Fecha Compra</th>
+                <th>Cantidad</th>
+                <th>Precio Compra US$</th>
+                <th>Invertido Total US$</th>
+                <th>Precio Actual US$</th>
+                <th>Valor Presente US$</th>
+                <th>Ganancia / Pérdida US$</th>
+                <th>Retorno %</th>
+                <th>Días</th>
+                <th>🤖 Pronóstico & Horizonte</th>
+                <th style="text-align: center; background: rgba(16, 185, 129, 0.2); color: #10b981;">Operación</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-open">
+              <!-- Renderizado dinámico con botón VENDER visible -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: POSICIONES CERRADAS -->
+    <section id="tab-closed" style="display: none;">
+      <div class="card">
+        <div class="card-title">
+          <span>🔴 Historial de Compras y Ventas Realizadas</span>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Fecha Compra</th>
+                <th>Fecha Venta</th>
+                <th>Cantidad</th>
+                <th>P. Compra US$</th>
+                <th>P. Venta US$</th>
+                <th>Total Invertido</th>
+                <th>Total Recuperado</th>
+                <th>Ganancia Realizada</th>
+                <th>Retorno %</th>
+                <th>Días</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-closed">
+              <!-- Renderizado dinámico -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: IMPORTADOR DE EXCEL -->
+    <section id="tab-import" style="display: none;">
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-title">
+          <span>📂 Carga de Archivos Excel (`.xlsx`, `.xls`, `.csv`)</span>
+        </div>
+        <div class="dropzone" id="excel-dropzone" onclick="document.getElementById('excel-file-input').click()">
+          <div class="dropzone-icon">📥</div>
+          <h3>Arrastra tu archivo Excel aquí o haz clic para seleccionar</h3>
+          <p style="color: var(--text-muted); margin-top: 8px; font-size: 13px;">
+            Soporta archivos Excel como <strong>Portafolio 2026.xlsx</strong>. El sistema procesará automáticamente las compras y ventas.
+          </p>
+          <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" style="display: none;" onchange="app.handleFileSelect(event)">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>💾 Descarga de Respaldo Completo</span>
+        </div>
+        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 16px;">
+          Descarga en cualquier momento una copia actualizada de toda tu base de datos histórica en formato Excel (.xlsx).
+        </p>
+        <button class="btn btn-secondary" onclick="window.location.href='/api/export-excel'">
+          📊 Descargar Cartera Completa en Excel
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: NUEVA COMPRA -->
+  <div class="modal-backdrop" id="modal-buy">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">➕ Registrar Nueva Compra de Acción</div>
+        <button class="modal-close" onclick="app.closeBuyModal()">✕</button>
+      </div>
+      <form onsubmit="app.saveBuy(event)">
+        <div class="form-group">
+          <label class="form-label">Ticker / Símbolo Acción (EE.UU.)</label>
+          <input type="text" id="buy-symbol" class="form-input" placeholder="ej. NVDA, AAPL, TSLA" required style="text-transform: uppercase;">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Fecha de Compra</label>
+            <input type="date" id="buy-date" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Monto Invertido US$</label>
+            <input type="number" step="any" id="buy-total" class="form-input" placeholder="ej. 100.00" required oninput="app.calcBuyQty()">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Precio por Acción US$</label>
+            <input type="number" step="any" id="buy-price" class="form-input" placeholder="ej. 111.55" required oninput="app.calcBuyQty()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cantidad de Acciones (Calculado)</label>
+            <input type="number" step="any" id="buy-qty" class="form-input" placeholder="Autocalculado" readonly style="background: rgba(255,255,255,0.05); font-weight: bold; color: #10b981;">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Stop Loss US$ (Opcional)</label>
+            <input type="number" step="any" id="buy-stop" class="form-input" placeholder="ej. 110.00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notas / Observaciones (Opcional)</label>
+            <input type="text" id="buy-notes" class="form-input" placeholder="ej. Estrategia a los US$ 150">
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeBuyModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Compra</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: REGISTRAR VENTA -->
+  <div class="modal-backdrop" id="modal-sell">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">💵 Registrar Venta de Acción</div>
+        <button class="modal-close" onclick="app.closeSellModal()">✕</button>
+      </div>
+      <form onsubmit="app.saveSell(event)">
+        <input type="hidden" id="sell-id">
+        
+        <!-- Selección de Posición si se abre desde el botón principal -->
+        <div class="form-group" id="group-select-position" style="display: none;">
+          <label class="form-label">Selecciona la Acción a Vender</label>
+          <select id="sell-select-id" class="form-input" onchange="app.handlePositionSelectChange(this)">
+            <!-- Opciones dinámicas -->
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Acción a Vender</label>
+          <input type="text" id="sell-symbol" class="form-input" readonly style="background: rgba(255,255,255,0.05); font-weight: bold; color: #10b981;">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Fecha de Venta</label>
+            <input type="date" id="sell-date" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Precio por Acción Venta US$</label>
+            <input type="number" step="any" id="sell-price" class="form-input" placeholder="ej. 135.00" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Notas de Cierre</label>
+          <input type="text" id="sell-notes" class="form-input" placeholder="ej. Venta con ganancia alcanzada">
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeSellModal()">Cancelar</button>
+          <button type="submit" class="btn btn-success">Confirmar Venta</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EDITAR POSICIÓN -->
+  <div class="modal-backdrop" id="modal-edit">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">✏️ Editar Posición de Acción</div>
+        <button class="modal-close" onclick="app.closeEditModal()">✕</button>
+      </div>
+      <form onsubmit="app.saveEdit(event)">
+        <input type="hidden" id="edit-id">
+        <div class="form-group">
+          <label class="form-label">Ticker / Símbolo Acción</label>
+          <input type="text" id="edit-symbol" class="form-input" readonly style="background: rgba(255,255,255,0.05); font-weight: bold; color: #3b82f6;">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Fecha de Compra</label>
+            <input type="date" id="edit-date" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Monto Invertido US$</label>
+            <input type="number" step="any" id="edit-total" class="form-input" placeholder="ej. 100.00" required oninput="app.calcEditQty()">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Precio por Acción US$</label>
+            <input type="number" step="any" id="edit-price" class="form-input" placeholder="ej. 111.55" required oninput="app.calcEditQty()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cantidad de Acciones (Calculado)</label>
+            <input type="number" step="any" id="edit-qty" class="form-input" placeholder="Autocalculado" readonly style="background: rgba(255,255,255,0.05); font-weight: bold; color: #10b981;">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Stop Loss US$ (Opcional)</label>
+            <input type="number" step="any" id="edit-stop" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notas / Observaciones</label>
+            <input type="text" id="edit-notes" class="form-input">
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeEditModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: RESUMEN DE NOTICIA EN ESPAÑOL -->
+  <div class="modal-backdrop" id="modal-news">
+    <div class="modal-box" style="max-width: 600px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>📰 Resumen de Noticia</span>
+          <span class="brand-badge" id="news-modal-symbol">TSLA</span>
+        </div>
+        <button class="modal-close" onclick="app.closeNewsModal()">✕</button>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <h3 id="news-modal-title" style="font-size: 16px; font-weight: 700; color: #fff; line-height: 1.4; margin-bottom: 8px;"></h3>
+        <div style="font-size: 12px; color: var(--text-muted); display: flex; gap: 16px;">
+          <span>🏛️ Fuente: <strong id="news-modal-publisher" style="color: var(--primary);"></strong></span>
+          <span>🕒 Publicado: <span id="news-modal-time"></span></span>
+        </div>
+      </div>
+
+      <div style="background: rgba(0,0,0,0.3); border-left: 4px solid var(--primary); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Resumen & Análisis Financiero</div>
+        <p id="news-modal-summary" style="font-size: 14px; color: var(--text-main); line-height: 1.6;"></p>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+        <button type="button" class="btn btn-primary" onclick="app.closeNewsModal()">Entendido / Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PRONÓSTICO & RECOMENDACIÓN ALGORÍTMICA -->
+  <div class="modal-backdrop" id="modal-forecast">
+    <div class="modal-box" style="max-width: 620px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>🤖 Pronóstico & Recomendación Algorítmica</span>
+          <span class="brand-badge" id="fc-modal-symbol">TSLA</span>
+        </div>
+        <button class="modal-close" onclick="app.closeForecastModal()">✕</button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+        <div style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Recomendación Táctica</div>
+          <div id="fc-modal-action" style="font-size: 20px; font-weight: 800; margin-top: 4px;">MANTENER</div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Horizonte Estimado</div>
+          <div id="fc-modal-horizon" style="font-size: 18px; font-weight: 800; color: #60a5fa; margin-top: 4px;">2 a 3 Semanas</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+        <div style="background: rgba(16,185,129,0.08); padding: 14px; border-radius: 10px; border: 1px solid rgba(16,185,129,0.3);">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Precio Objetivo Estimado</div>
+          <div id="fc-modal-target-price" style="font-size: 18px; font-weight: 800; color: #10b981;">$345.00</div>
+          <div id="fc-modal-target-return" style="font-size: 12px; color: #10b981; font-weight: 600;">+12.0% Retorno Esperado</div>
+        </div>
+
+        <div style="background: rgba(59,130,246,0.08); padding: 14px; border-radius: 10px; border: 1px solid rgba(59,130,246,0.3);">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Precio Actual vs Compra</div>
+          <div id="fc-modal-current" style="font-size: 18px; font-weight: 800; color: #fff;">$306.79</div>
+          <div id="fc-modal-buy" style="font-size: 12px; color: var(--text-muted);">Comprado a $426.61</div>
+        </div>
+      </div>
+
+      <div style="background: rgba(0,0,0,0.3); border-left: 4px solid var(--primary); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Análisis & Razonamiento Algorítmico</div>
+        <p id="fc-modal-reason" style="font-size: 14px; color: var(--text-main); line-height: 1.6;"></p>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+        <button type="button" class="btn btn-primary" onclick="app.closeForecastModal()">Entendido / Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS Principal -->
+  <script src="/js/app.js"></script>
+</body>
+</html>
