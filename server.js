@@ -5,6 +5,8 @@ const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
 const multer = require('multer');
 const xlsx = require('xlsx');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const { initDb, dbPath, tickerMap } = require('./database/initDb');
 const { getStockPrices, getIntradayChartData } = require('./services/stockPriceService');
@@ -13,6 +15,7 @@ const { analyzePositionForecast } = require('./services/forecastService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'cartera_secret_key_2026';
 
 app.use(cors());
 app.use(express.json());
@@ -26,12 +29,111 @@ const db = initDb();
 const upload = multer({ dest: path.join(__dirname, 'uploads/') });
 
 // ==========================================
-// ENDPOINTS REST API
+// MIDDLEWARE DE AUTENTICACIÓN
+// ==========================================
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    // Si no hay token, usar usuario por defecto ID 1 (Mauricio Martinez)
+    req.user = { id: 1, name: 'Mauricio Martinez', email: 'mauricio@cartera.com' };
+    return next();
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      req.user = { id: 1, name: 'Mauricio Martinez', email: 'mauricio@cartera.com' };
+      return next();
+    }
+    req.user = user;
+    next();
+  });
+}
+
+// ==========================================
+// ENDPOINTS DE AUTENTICACIÓN
 // ==========================================
 
-// 1. Resumen General del Portafolio con Cotizaciones en Vivo
-app.get('/api/portfolio/summary', async (req, res) => {
-  db.all('SELECT * FROM transactions ORDER BY buy_date DESC, id DESC', [], async (err, rows) => {
+// 1. Registro de nuevo usuario
+app.post('/api/auth/register', (req, res) => {
+  const { name, email, password } = req.body;
+
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: 'Nombre, email y contraseña son requeridos' });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const passwordHash = bcrypt.hashSync(password, 10);
+
+  const stmt = db.prepare(`
+    INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)
+  `);
+
+  stmt.run([name.trim(), cleanEmail, passwordHash], function(err) {
+    if (err) {
+      if (err.message.includes('UNIQUE')) {
+        return res.status(400).json({ error: 'El correo electrónico ya está registrado. Intenta iniciar sesión.' });
+      }
+      return res.status(500).json({ error: err.message });
+    }
+
+    const userId = this.lastID;
+    const userPayload = { id: userId, name: name.trim(), email: cleanEmail };
+    const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: '30d' });
+
+    res.json({
+      message: 'Cuenta creada con éxito',
+      token,
+      user: userPayload
+    });
+  });
+});
+
+// 2. Inicio de sesión (Login)
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email y contraseña son requeridos' });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  db.get('SELECT * FROM users WHERE email = ?', [cleanEmail], (err, user) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!user) return res.status(400).json({ error: 'Usuario no encontrado' });
+
+    const validPassword = bcrypt.compareSync(password, user.password_hash);
+    if (!validPassword) {
+      return res.status(400).json({ error: 'Contraseña incorrecta' });
+    }
+
+    const userPayload = { id: user.id, name: user.name, email: user.email };
+    const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: '30d' });
+
+    res.json({
+      message: 'Inicio de sesión exitoso',
+      token,
+      user: userPayload
+    });
+  });
+});
+
+// 3. Obtener usuario actual en sesión
+app.get('/api/auth/me', authenticateToken, (req, res) => {
+  res.json({ user: req.user });
+});
+
+// ==========================================
+// ENDPOINTS DE PORTAFOLIO Y TRANSACCIONES
+// ==========================================
+
+// 1. Resumen General del Portafolio del usuario autenticado
+app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+
+  db.all('SELECT * FROM transactions WHERE user_id = ? ORDER BY buy_date DESC, id DESC', [userId], async (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -39,7 +141,6 @@ app.get('/api/portfolio/summary', async (req, res) => {
     const openRows = rows.filter(r => r.status === 'open');
     const closedRows = rows.filter(r => r.status === 'closed');
 
-    // Tickers únicos en posiciones abiertas
     const openSymbols = openRows.map(r => r.symbol);
     const livePrices = await getStockPrices(openSymbols);
 
@@ -59,7 +160,6 @@ app.get('/api/portfolio/summary', async (req, res) => {
       currentPortfolioValue += currentValue;
       totalDailyChangeDollar += dailyChange;
 
-      // Calcular días transcurridos desde fecha de compra
       let daysHeld = 0;
       if (row.buy_date) {
         const bDate = new Date(row.buy_date);
@@ -95,7 +195,6 @@ app.get('/api/portfolio/summary', async (req, res) => {
     const unrealizedGainTotal = currentPortfolioValue - totalOpenInvested;
     const unrealizedGainPercentTotal = totalOpenInvested > 0 ? (unrealizedGainTotal / totalOpenInvested) * 100 : 0;
 
-    // Calcular estadísticas de posiciones cerradas
     let totalClosedInvested = 0;
     let totalClosedReturned = 0;
     let totalRealizedGain = 0;
@@ -111,7 +210,6 @@ app.get('/api/portfolio/summary', async (req, res) => {
     const realizedGainPercentTotal = totalClosedInvested > 0 ? (totalRealizedGain / totalClosedInvested) * 100 : 0;
     const winRatePercent = closedRows.length > 0 ? (winningTrades / closedRows.length) * 100 : 0;
 
-    // Distribución de cartera para gráficos (Agrupado por Ticker)
     const allocationMap = {};
     openPositions.forEach(p => {
       allocationMap[p.symbol] = (allocationMap[p.symbol] || 0) + p.currentValue;
@@ -123,7 +221,6 @@ app.get('/api/portfolio/summary', async (req, res) => {
       percentage: currentPortfolioValue > 0 ? Number(((allocationMap[sym] / currentPortfolioValue) * 100).toFixed(2)) : 0
     }));
 
-    // Obtener noticias financieras para las posiciones abiertas
     const news = await getPortfolioNews(openSymbols);
 
     res.json({
@@ -151,14 +248,16 @@ app.get('/api/portfolio/summary', async (req, res) => {
   });
 });
 
-// 2. Obtener lista de transacciones con filtro opcional
-app.get('/api/transactions', (req, res) => {
+// 2. Obtener lista de transacciones del usuario
+app.get('/api/transactions', authenticateToken, (req, res) => {
+  const userId = req.user.id;
   const status = req.query.status;
-  let sql = 'SELECT * FROM transactions';
-  const params = [];
+
+  let sql = 'SELECT * FROM transactions WHERE user_id = ?';
+  const params = [userId];
 
   if (status && status !== 'all') {
-    sql += ' WHERE status = ?';
+    sql += ' AND status = ?';
     params.push(status);
   }
 
@@ -170,8 +269,9 @@ app.get('/api/transactions', (req, res) => {
   });
 });
 
-// 3. Registrar una nueva Compra (BUY)
-app.post('/api/transactions/buy', (req, res) => {
+// 3. Registrar una nueva Compra (BUY) para el usuario
+app.post('/api/transactions/buy', authenticateToken, (req, res) => {
+  const userId = req.user.id;
   const { symbol, original_name, buy_date, quantity, buy_price, stop_loss, notes } = req.body;
 
   if (!symbol || !quantity || !buy_price) {
@@ -187,25 +287,26 @@ app.post('/api/transactions/buy', (req, res) => {
 
   const stmt = db.prepare(`
     INSERT INTO transactions (
-      symbol, original_name, type, buy_date, quantity, buy_price, buy_total, stop_loss, status, notes
-    ) VALUES (?, ?, 'BUY', ?, ?, ?, ?, ?, 'open', ?)
+      user_id, symbol, original_name, type, buy_date, quantity, buy_price, buy_total, stop_loss, status, notes
+    ) VALUES (?, ?, ?, 'BUY', ?, ?, ?, ?, ?, 'open', ?)
   `);
 
-  stmt.run([cleanSymbol, original_name || cleanSymbol, bDate, numQty, numPrice, buyTotal, numStopLoss, notes || ''], function(err) {
+  stmt.run([userId, cleanSymbol, original_name || cleanSymbol, bDate, numQty, numPrice, buyTotal, numStopLoss, notes || ''], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ message: 'Compra registrada con éxito', id: this.lastID });
   });
 });
 
-// 4. Registrar una Venta (SELL) para una posición abierta
-app.post('/api/transactions/sell', (req, res) => {
+// 4. Registrar una Venta (SELL)
+app.post('/api/transactions/sell', authenticateToken, (req, res) => {
+  const userId = req.user.id;
   const { id, sell_date, sell_price, notes } = req.body;
 
   if (!id || !sell_price) {
     return res.status(400).json({ error: 'ID de transacción y precio de venta son requeridos' });
   }
 
-  db.get('SELECT * FROM transactions WHERE id = ?', [id], (err, row) => {
+  db.get('SELECT * FROM transactions WHERE id = ? AND user_id = ?', [id, userId], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ error: 'Posición no encontrada' });
 
@@ -216,7 +317,6 @@ app.post('/api/transactions/sell', (req, res) => {
     const realizedGain = sellTotal - row.buy_total;
     const returnPercent = row.buy_total > 0 ? (realizedGain / row.buy_total) * 100 : 0;
 
-    // Calcular días en cartera
     const bDate = new Date(row.buy_date || Date.now());
     const sDateObj = new Date(sDate);
     const diffTime = Math.abs(sDateObj - bDate);
@@ -233,18 +333,19 @@ app.post('/api/transactions/sell', (req, res) => {
         days_held = ?,
         return_percent = ?,
         notes = ?
-      WHERE id = ?
+      WHERE id = ? AND user_id = ?
     `;
 
-    db.run(sql, [sDate, sQty, sPrice, sellTotal, realizedGain, daysHeld, returnPercent, notes || row.notes, id], function(err) {
+    db.run(sql, [sDate, sQty, sPrice, sellTotal, realizedGain, daysHeld, returnPercent, notes || row.notes, id, userId], function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ message: 'Venta realizada y posición cerrada con éxito', id });
     });
   });
 });
 
-// 4b. Editar una transacción existente
-app.post('/api/transactions/edit', (req, res) => {
+// 5. Editar una transacción
+app.post('/api/transactions/edit', authenticateToken, (req, res) => {
+  const userId = req.user.id;
   const { id, buy_date, quantity, buy_price, stop_loss, notes } = req.body;
 
   if (!id || !buy_price || !quantity) {
@@ -264,39 +365,41 @@ app.post('/api/transactions/edit', (req, res) => {
       buy_total = ?,
       stop_loss = ?,
       notes = ?
-    WHERE id = ?
+    WHERE id = ? AND user_id = ?
   `;
 
-  db.run(sql, [buy_date, numQty, numPrice, buyTotal, numStopLoss, notes || '', id], function(err) {
+  db.run(sql, [buy_date, numQty, numPrice, buyTotal, numStopLoss, notes || '', id, userId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ message: 'Transacción actualizada con éxito', id });
   });
 });
 
-// 5. Eliminar una transacción
-app.delete('/api/transactions/:id', (req, res) => {
-  db.run('DELETE FROM transactions WHERE id = ?', [req.params.id], function(err) {
+// 6. Eliminar una transacción
+app.delete('/api/transactions/:id', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  db.run('DELETE FROM transactions WHERE id = ? AND user_id = ?', [req.params.id, userId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ message: 'Registro eliminado', changes: this.changes });
   });
 });
 
-// 6. Consultar precios en tiempo real para cualquier lista de tickers
+// 7. Consultar precios en tiempo real
 app.get('/api/prices', async (req, res) => {
   const symbols = req.query.symbols ? req.query.symbols.split(',') : ['AAPL', 'NVDA', 'TSLA', 'MSFT', 'AMZN', 'GOOGL', 'META'];
   const prices = await getStockPrices(symbols);
   res.json(prices);
 });
 
-// 6b. Endpoint de gráfico intradiario (cada 30 min)
+// 8. Gráfico intradiario (cada 30 min)
 app.get('/api/chart/intraday', async (req, res) => {
   const symbol = req.query.symbol || 'TSLA';
   const data = await getIntradayChartData(symbol);
   res.json(data);
 });
 
-// 7. Importar archivo Excel o CSV por drag and drop
-app.post('/api/import-excel', upload.single('file'), (req, res) => {
+// 9. Importar archivo Excel o CSV para el usuario autenticado
+app.post('/api/import-excel', authenticateToken, upload.single('file'), (req, res) => {
+  const userId = req.user.id;
   if (!req.file) {
     return res.status(400).json({ error: 'No se subió ningún archivo' });
   }
@@ -308,7 +411,6 @@ app.post('/api/import-excel', upload.single('file'), (req, res) => {
     const rows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: false, defval: '' });
 
     let count = 0;
-    // Buscar fila de encabezados
     let headerIdx = -1;
     for (let i = 0; i < Math.min(10, rows.length); i++) {
       const rStr = rows[i].join(' ').toLowerCase();
@@ -322,9 +424,9 @@ app.post('/api/import-excel', upload.single('file'), (req, res) => {
 
     const stmt = db.prepare(`
       INSERT INTO transactions (
-        notes, symbol, original_name, buy_date, quantity, buy_price, buy_total, stop_loss, status,
+        user_id, notes, symbol, original_name, buy_date, quantity, buy_price, buy_total, stop_loss, status,
         sell_date, sell_quantity, sell_price, sell_total, realized_gain, days_held, return_percent
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     dataRows.forEach(r => {
@@ -351,7 +453,7 @@ app.post('/api/import-excel', upload.single('file'), (req, res) => {
 
       if (symbol && quantity > 0) {
         stmt.run([
-          notes, symbol, rawTicker, buyDate, quantity, buyPrice, buyTotal, stopLoss, status,
+          userId, notes, symbol, rawTicker, buyDate, quantity, buyPrice, buyTotal, stopLoss, status,
           sellDate, sellQuantity, sellPrice, sellTotal, realizedGain, daysHeld, returnPercent
         ]);
         count++;
@@ -359,7 +461,7 @@ app.post('/api/import-excel', upload.single('file'), (req, res) => {
     });
 
     stmt.finalize();
-    fs.unlinkSync(filePath); // Limpiar temporal
+    fs.unlinkSync(filePath);
     res.json({ message: `Se importaron ${count} operaciones correctamente desde el Excel.`, count });
   } catch (err) {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -367,9 +469,10 @@ app.post('/api/import-excel', upload.single('file'), (req, res) => {
   }
 });
 
-// 8. Exportar base de datos a Excel
-app.get('/api/export-excel', (req, res) => {
-  db.all('SELECT * FROM transactions ORDER BY buy_date DESC', [], (err, rows) => {
+// 10. Exportar base de datos del usuario a Excel
+app.get('/api/export-excel', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  db.all('SELECT * FROM transactions WHERE user_id = ? ORDER BY buy_date DESC', [userId], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
 
     const exportData = rows.map(r => ({

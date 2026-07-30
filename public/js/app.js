@@ -1,26 +1,146 @@
 const app = {
   data: null,
+  currentUser: null,
   charts: {},
   refreshInterval: null,
+  selectedIntradaySymbol: 'TSLA',
 
   async init() {
-    // Establecer fecha por defecto en los formularios
     const todayStr = new Date().toISOString().split('T')[0];
-    document.getElementById('buy-date').value = todayStr;
-    document.getElementById('sell-date').value = todayStr;
+    const buyDateElem = document.getElementById('buy-date');
+    const sellDateElem = document.getElementById('sell-date');
+    if (buyDateElem) buyDateElem.value = todayStr;
+    if (sellDateElem) sellDateElem.value = todayStr;
 
-    // Configurar Drag & Drop para Excel
     this.setupDragAndDrop();
 
-    // Cargar datos por primera vez
+    // Verificar si hay usuario/token guardado
+    const token = localStorage.getItem('token');
+    const userJson = localStorage.getItem('user');
+
+    if (token && userJson) {
+      try {
+        this.currentUser = JSON.parse(userJson);
+        this.updateUserBar();
+      } catch (e) {}
+    } else {
+      // Si no hay sesión, iniciar con cuenta Mauricio por defecto
+      this.currentUser = { id: 1, name: 'Mauricio Martinez', email: 'mauricio@cartera.com' };
+      this.updateUserBar();
+    }
+
     await this.fetchPortfolio();
 
-    // Auto-refresco de cotizaciones en tiempo real cada 15 segundos
     this.refreshInterval = setInterval(() => {
       this.fetchPortfolio(true);
     }, 15000);
   },
 
+  getAuthHeaders() {
+    const token = localStorage.getItem('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  },
+
+  updateUserBar() {
+    const nameElem = document.getElementById('current-user-name');
+    if (nameElem && this.currentUser) {
+      nameElem.innerText = this.currentUser.name;
+    }
+  },
+
+  // ==========================================
+  // AUTENTICACIÓN (LOGIN / REGISTRO / LOGOUT)
+  // ==========================================
+  openAuthModal() {
+    document.getElementById('modal-auth').classList.add('active');
+  },
+  closeAuthModal() {
+    document.getElementById('modal-auth').classList.remove('active');
+  },
+
+  switchAuthTab(tab) {
+    document.getElementById('auth-tab-login').classList.remove('active');
+    document.getElementById('auth-tab-register').classList.remove('active');
+    document.getElementById('form-login').style.display = 'none';
+    document.getElementById('form-register').style.display = 'none';
+
+    if (tab === 'login') {
+      document.getElementById('auth-tab-login').classList.add('active');
+      document.getElementById('form-login').style.display = 'block';
+    } else {
+      document.getElementById('auth-tab-register').classList.add('active');
+      document.getElementById('form-register').style.display = 'block';
+    }
+  },
+
+  async submitLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error en inicio de sesión');
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      this.currentUser = data.user;
+      this.updateUserBar();
+      this.closeAuthModal();
+
+      await this.fetchPortfolio();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  },
+
+  async submitRegister(e) {
+    e.preventDefault();
+    const name = document.getElementById('reg-name').value;
+    const email = document.getElementById('reg-email').value;
+    const password = document.getElementById('reg-password').value;
+
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error en registro');
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      this.currentUser = data.user;
+      this.updateUserBar();
+      this.closeAuthModal();
+
+      alert(`¡Bienvenido ${data.user.name}! Tu cuenta privada ha sido creada.`);
+      await this.fetchPortfolio();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  },
+
+  logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    this.currentUser = null;
+    this.openAuthModal();
+  },
+
+  // ==========================================
+  // CARGA DE DATOS Y RENDERIZADO
+  // ==========================================
   async fetchPortfolio(isSilent = false) {
     if (!isSilent) {
       const spinner = document.getElementById('refresh-spinner');
@@ -28,12 +148,19 @@ const app = {
     }
 
     try {
-      const res = await fetch('/api/portfolio/summary');
-      if (!res.ok) throw new Error('Error al cargar datos');
+      const res = await fetch('/api/portfolio/summary', {
+        headers: this.getAuthHeaders()
+      });
+      if (!res.ok) {
+        if (res.status === 401) {
+          this.openAuthModal();
+          return;
+        }
+        throw new Error('Error al cargar datos');
+      }
       const data = await res.json();
       this.data = data;
 
-      // Renderizar la UI
       this.renderSummary(data.summary);
       this.renderVerticalTickerList(data.openPositions);
       this.renderCharts(data.openPositions);
@@ -78,13 +205,12 @@ const app = {
     document.getElementById('count-closed').innerText = s.closedPositionsCount;
   },
 
-  // 🔴 CAMBIO 2: LISTA DE ACCIONES VERTICAL
   renderVerticalTickerList(openPositions) {
     const listElem = document.getElementById('vertical-ticker-list');
     if (!listElem) return;
 
     if (!openPositions || openPositions.length === 0) {
-      listElem.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px;">No hay acciones activas.</div>`;
+      listElem.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px;">No hay acciones activas en tu cartera.</div>`;
       return;
     }
 
@@ -165,13 +291,9 @@ const app = {
     document.getElementById('modal-news').classList.remove('active');
   },
 
-  selectedIntradaySymbol: 'TSLA',
-
   renderCharts(openPositions) {
-    // 1. Llenar el selector de acciones con las posiciones abiertas
     const selectElem = document.getElementById('chart-stock-select');
     if (selectElem && openPositions && openPositions.length > 0) {
-      // Si la acción seleccionada actualmente no está en las opciones, seleccionar la primera
       const currentSelected = this.selectedIntradaySymbol;
       let html = '';
       openPositions.forEach(p => {
@@ -185,7 +307,6 @@ const app = {
       }
     }
 
-    // 2. Renderizar el gráfico intradiario lineal
     this.fetchAndRenderIntradayChart(this.selectedIntradaySymbol);
   },
 
@@ -275,11 +396,10 @@ const app = {
     }
   },
 
-  // 🔴 CAMBIO 1: TABLA DE POSICIONES ABIERTAS CON BOTÓN VENDER ULTRA DESTACADO
   renderOpenTable(openPositions) {
     const tbody = document.getElementById('tbody-open');
     if (!openPositions || openPositions.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: var(--text-muted);">No tienes posiciones abiertas en este momento.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-muted);">No tienes posiciones abiertas en este momento.</td></tr>`;
       return;
     }
 
@@ -317,7 +437,6 @@ const app = {
             </span>
           </td>
           <td>${p.daysHeld}d</td>
-          <!-- PRONÓSTICO & HORIZONTE DE TIEMPO ESTIMADO -->
           <td>
             <div onclick="app.openForecastModal(${p.id})" style="cursor: pointer;" title="Haz clic para ver el análisis algorítmico completo">
               <span class="${p.forecast.actionColor === 'danger' ? 'badge-down' : (p.forecast.actionColor === 'warning' ? 'badge-status status-open' : 'badge-up')}" style="font-size: 11px; padding: 4px 8px;">
@@ -328,7 +447,6 @@ const app = {
               </div>
             </div>
           </td>
-          <!-- BOTÓN VENDER Y EDITAR -->
           <td style="text-align: center;">
             <div style="display: flex; gap: 6px; justify-content: center;">
               <button class="btn btn-success" style="padding: 6px 10px; font-weight: 700; font-size: 11px; box-shadow: 0 0 8px rgba(16,185,129,0.4);" onclick="app.openSellModal(${p.id}, '${p.symbol}', ${p.livePrice})">
@@ -399,7 +517,6 @@ const app = {
     event.target.classList.add('active');
   },
 
-  // CÁLCULO DE CANTIDAD DE ACCIONES (MONTO / PRECIO)
   calcBuyQty() {
     const total = parseFloat(document.getElementById('buy-total').value);
     const price = parseFloat(document.getElementById('buy-price').value);
@@ -422,7 +539,6 @@ const app = {
     }
   },
 
-  // PRONÓSTICO Y ALGORITMO DE TRADING
   openForecastModal(id) {
     const openPositions = this.data ? this.data.openPositions : [];
     const item = openPositions.find(p => Number(p.id) === Number(id));
@@ -444,19 +560,14 @@ const app = {
 
     document.getElementById('modal-forecast').classList.add('active');
   },
-
   closeForecastModal() {
     document.getElementById('modal-forecast').classList.remove('active');
   },
 
-  // MODALES
   openEditModal(id) {
     const openPositions = this.data ? this.data.openPositions : [];
     const item = openPositions.find(p => Number(p.id) === Number(id));
-    if (!item) {
-      console.warn('No se encontró la posición con id:', id);
-      return;
-    }
+    if (!item) return;
 
     const setVal = (elemId, val) => {
       const el = document.getElementById(elemId);
@@ -473,9 +584,7 @@ const app = {
     setVal('edit-notes', item.notes || '');
 
     const modal = document.getElementById('modal-edit');
-    if (modal) {
-      modal.classList.add('active');
-    }
+    if (modal) modal.classList.add('active');
   },
   closeEditModal() {
     document.getElementById('modal-edit').classList.remove('active');
@@ -494,7 +603,7 @@ const app = {
     try {
       const res = await fetch('/api/transactions/edit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error('Error al actualizar');
@@ -512,7 +621,6 @@ const app = {
     document.getElementById('modal-buy').classList.remove('active');
   },
 
-  // 🔴 BOTÓN VENDER PRINCIPAL DESDE EL ENCABEZADO
   openSellModalFromHeader() {
     const openPositions = this.data ? this.data.openPositions : [];
     if (!openPositions || openPositions.length === 0) {
@@ -530,7 +638,6 @@ const app = {
     });
     selectElem.innerHTML = optionsHtml;
 
-    // Seleccionar la primera posición
     const firstPos = openPositions[0];
     this.openSellModal(firstPos.id, firstPos.symbol, firstPos.livePrice);
   },
@@ -559,10 +666,16 @@ const app = {
 
   async saveBuy(e) {
     e.preventDefault();
+    const qty = document.getElementById('buy-qty').value;
+    if (!qty || parseFloat(qty) <= 0) {
+      alert('Por favor ingresa un Monto Invertido y Precio por Acción válidos.');
+      return;
+    }
+
     const payload = {
       symbol: document.getElementById('buy-symbol').value,
       buy_date: document.getElementById('buy-date').value,
-      quantity: document.getElementById('buy-qty').value,
+      quantity: qty,
       buy_price: document.getElementById('buy-price').value,
       stop_loss: document.getElementById('buy-stop').value,
       notes: document.getElementById('buy-notes').value
@@ -571,7 +684,7 @@ const app = {
     try {
       const res = await fetch('/api/transactions/buy', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error('Error al registrar compra');
@@ -595,7 +708,7 @@ const app = {
     try {
       const res = await fetch('/api/transactions/sell', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error('Error al registrar venta');
@@ -647,8 +760,13 @@ const app = {
     formData.append('file', file);
 
     try {
+      const token = localStorage.getItem('token');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch('/api/import-excel', {
         method: 'POST',
+        headers: headers,
         body: formData
       });
       const data = await res.json();
@@ -659,6 +777,13 @@ const app = {
     } catch (err) {
       alert('Error cargando Excel: ' + err.message);
     }
+  },
+
+  async exportExcel() {
+    const token = localStorage.getItem('token');
+    let url = '/api/export-excel';
+    if (token) url += `?token=${token}`;
+    window.location.href = url;
   }
 };
 

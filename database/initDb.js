@@ -2,6 +2,7 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 const xlsx = require('xlsx');
+const bcrypt = require('bcryptjs');
 
 const dbPath = path.join(__dirname, 'portfolio.db');
 const excelPath = 'C:\\Users\\mmartinez\\OneDrive - DELLORTO\\Escritorio\\Portafolio 2026.xlsx';
@@ -58,14 +59,26 @@ function initDb() {
       console.error('Error abriendo la base de datos:', err.message);
       return;
     }
-    console.log('Base de datos SQLite conectada correctamente en:', dbPath);
+    console.log('Base de datos SQLite conectada en:', dbPath);
   });
 
   db.serialize(() => {
-    // 1. Tabla de transacciones
+    // 1. Tabla de Usuarios
+    db.run(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 2. Tabla de Transacciones con user_id
     db.run(`
       CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER DEFAULT 1,
         symbol TEXT NOT NULL,
         original_name TEXT,
         type TEXT DEFAULT 'BUY',
@@ -83,14 +96,36 @@ function initDb() {
         days_held INTEGER,
         return_percent REAL,
         notes TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
       )
     `);
 
-    // 2. Tabla de historial de snapshots
+    // Migrar tabla existente agregando columna user_id si no existe
+    db.run(`ALTER TABLE transactions ADD COLUMN user_id INTEGER DEFAULT 1`, (err) => {
+      // Ignorar error si la columna ya existe
+    });
+
+    // Crear cuenta de usuario principal Mauricio Martinez por defecto si no existe
+    db.get('SELECT COUNT(*) as count FROM users', [], (err, row) => {
+      if (err) return;
+      if (row.count === 0) {
+        const passwordHash = bcrypt.hashSync('mauricio2026', 10);
+        db.run(
+          `INSERT INTO users (id, name, email, password_hash) VALUES (1, 'Mauricio Martinez', 'mauricio@cartera.com', ?)`,
+          [passwordHash],
+          function(err) {
+            if (!err) console.log('Usuario principal creado: Mauricio Martinez (mauricio@cartera.com)');
+          }
+        );
+      }
+    });
+
+    // 3. Tabla de Snapshots por usuario
     db.run(`
       CREATE TABLE IF NOT EXISTS portfolio_snapshots (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER DEFAULT 1,
         snapshot_date TEXT,
         total_value REAL,
         invested_value REAL,
@@ -100,36 +135,32 @@ function initDb() {
       )
     `);
 
-    // Verificar si ya hay datos cargados
-    db.get('SELECT COUNT(*) as count FROM transactions', [], (err, row) => {
-      if (err) {
-        console.error('Error al consultar transacciones:', err);
-        return;
-      }
+    // Verificar e importar registros históricos iniciales para el usuario 1
+    db.get('SELECT COUNT(*) as count FROM transactions WHERE user_id = 1', [], (err, row) => {
+      if (err) return;
 
       if (row.count === 0 && fs.existsSync(excelPath)) {
-        console.log('Importando registros iniciales desde Portafolio 2026.xlsx...');
+        console.log('Importando registros iniciales para Mauricio Martinez...');
         try {
           const workbook = xlsx.readFile(excelPath, { raw: false, cellDates: true });
           const sheetName = workbook.SheetNames[0];
           const sheet = workbook.Sheets[sheetName];
           const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
 
-          // La fila 4 contiene encabezados, las filas 5 en adelante son los datos
           const dataRows = rows.slice(4);
           let countInserted = 0;
 
           const stmt = db.prepare(`
             INSERT INTO transactions (
-              notes, symbol, original_name, buy_date, quantity, buy_price, buy_total, stop_loss, status,
+              user_id, notes, symbol, original_name, buy_date, quantity, buy_price, buy_total, stop_loss, status,
               sell_date, sell_quantity, sell_price, sell_total, realized_gain, days_held, return_percent
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `);
 
           dataRows.forEach((r) => {
             const notes = r[0] ? String(r[0]).trim() : '';
             const rawTicker = r[1] ? String(r[1]).trim() : '';
-            if (!rawTicker) return; // Saltar filas vacías
+            if (!rawTicker) return;
 
             const mappedSymbol = tickerMap[rawTicker] || rawTicker;
             const buyDate = parseDateStr(r[2]);
@@ -155,12 +186,10 @@ function initDb() {
           });
 
           stmt.finalize();
-          console.log(`¡Éxito! Se han importado ${countInserted} transacciones históricas a la base de datos.`);
+          console.log(`¡Éxito! Importadas ${countInserted} transacciones para Mauricio Martinez.`);
         } catch (e) {
-          console.error('Error al procesar el Excel:', e);
+          console.error('Error procesando el Excel:', e);
         }
-      } else if (row.count > 0) {
-        console.log(`La base de datos ya contiene ${row.count} transacciones.`);
       }
     });
   });
