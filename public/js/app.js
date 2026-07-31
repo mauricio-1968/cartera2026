@@ -351,13 +351,20 @@ const app = {
 
       if (this.intradayChartStyle === 'candle') {
         // ==========================================
-        // RENDERIZADO DE VELAS JAPONESAS (CANDLESTICK)
+        // RENDERIZADO DE VELAS JAPONESAS (CANDLESTICK ALTA VISIBILIDAD)
         // ==========================================
-        const barRanges = points.map(p => [p.low, p.high]);
-        const bodyRanges = points.map(p => [Math.min(p.open, p.close), Math.max(p.open, p.close)]);
-        const colors = points.map(p => p.close >= p.open ? '#10b981' : '#ef4444');
+        const allLows = points.map(p => p.low);
+        const allHighs = points.map(p => p.high);
+        const minPrice = Math.min(...allLows);
+        const maxPrice = Math.max(...allHighs);
+        const padding = (maxPrice - minPrice) * 0.05 || 1.0;
 
-        // Plugin personalizado para dibujar cuerpos y mechas de velas
+        const yMin = Math.floor((minPrice - padding) * 100) / 100;
+        const yMax = Math.ceil((maxPrice + padding) * 100) / 100;
+
+        const barRanges = points.map(p => [p.low, p.high]);
+
+        // Plugin optimizado de dibujo de velas con nitidez neón
         const candlePlugin = {
           id: 'candlePlugin',
           beforeDatasetsDraw(chart) {
@@ -368,24 +375,31 @@ const app = {
               const lowY = y.getPixelForValue(p.low);
               const openY = y.getPixelForValue(p.open);
               const closeY = y.getPixelForValue(p.close);
-              const color = p.close >= p.open ? '#10b981' : '#ef4444';
+              const isGreen = p.close >= p.open;
+              const color = isGreen ? '#10b981' : '#ef4444';
+              const strokeBorder = isGreen ? '#059669' : '#dc2626';
 
-              // 1. Mecha (Wick) de la vela (High a Low)
+              // 1. Mecha (Wick) de la vela (High a Low) - Grosor 2px
               ctx.save();
               ctx.strokeStyle = color;
-              ctx.lineWidth = 1.5;
+              ctx.lineWidth = 2;
               ctx.beginPath();
               ctx.moveTo(xPos, highY);
               ctx.lineTo(xPos, lowY);
               ctx.stroke();
 
-              // 2. Cuerpo de la vela (Open a Close)
+              // 2. Cuerpo de la vela (Open a Close) - Ancho 14px
               const topY = Math.min(openY, closeY);
-              const bodyHeight = Math.max(Math.abs(closeY - openY), 2); // Mínimo 2px de altura
-              const candleWidth = 10;
+              const bodyHeight = Math.max(Math.abs(closeY - openY), 3); // Mínimo 3px
+              const candleWidth = 14;
 
               ctx.fillStyle = color;
               ctx.fillRect(xPos - candleWidth / 2, topY, candleWidth, bodyHeight);
+
+              ctx.strokeStyle = strokeBorder;
+              ctx.lineWidth = 1;
+              ctx.strokeRect(xPos - candleWidth / 2, topY, candleWidth, bodyHeight);
+
               ctx.restore();
             });
           }
@@ -411,6 +425,8 @@ const app = {
                 grid: { color: 'rgba(255,255,255,0.04)' }
               },
               y: {
+                min: yMin,
+                max: yMax,
                 ticks: {
                   color: '#9ca3af',
                   font: { family: 'Outfit', size: 11 },
@@ -426,6 +442,7 @@ const app = {
                   label: function(context) {
                     const p = points[context.dataIndex];
                     return [
+                      `Hora: ${p.time} (NY)`,
                       `Apertura: $${p.open.toFixed(2)}`,
                       `Máximo: $${p.high.toFixed(2)}`,
                       `Mínimo: $${p.low.toFixed(2)}`,

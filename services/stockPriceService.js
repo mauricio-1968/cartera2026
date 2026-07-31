@@ -47,7 +47,7 @@ async function fetchSingleQuote(symbol) {
 }
 
 /**
- * Obtener datos de gráfico intradiario cada 30 minutos con OHLC completo (Open, High, Low, Close)
+ * Obtener datos de gráfico intradiario cada 30 minutos alineados al horario de la Bolsa de EE.UU. (America/New_York)
  */
 async function getIntradayChartData(symbol) {
   const sym = symbol ? symbol.trim().toUpperCase() : 'TSLA';
@@ -83,7 +83,14 @@ async function getIntradayChartData(symbol) {
           const l = lows[idx] !== null && lows[idx] !== undefined ? lows[idx] : Math.min(o, c);
 
           const dateObj = new Date(ts * 1000);
-          const timeLabel = dateObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+          // Formatear hora exacta en zona horaria de la Bolsa de Nueva York (Wall Street)
+          const timeLabel = dateObj.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+            timeZone: 'America/New_York'
+          });
+
           points.push({
             time: timeLabel,
             open: Number(o.toFixed(2)),
@@ -107,7 +114,7 @@ async function getIntradayChartData(symbol) {
     console.warn(`Error al consultar gráfico intradiario para ${sym}:`, err.message);
   }
 
-  // Fallback intradiario resiliente
+  // Fallback intradiario con horas de Wall Street (09:30 a 16:00)
   const fallbackPoints = [];
   const times = ['09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00'];
   let basePrice = 300.0;
