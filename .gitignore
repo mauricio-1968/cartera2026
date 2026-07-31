@@ -2,3 +2,6 @@ node_modules/
 uploads/
 .env
 *.log
+android/.gradle/
+android/build/
+android/app/build/

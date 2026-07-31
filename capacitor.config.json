@@ -1,0 +1,10 @@
+{
+  "appId": "com.mauriciomartinez.cartera2026",
+  "appName": "Cartera de Acciones",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://cartera2026.onrender.com",
+    "cleartext": true
+  }
+}
