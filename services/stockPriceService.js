@@ -47,7 +47,7 @@ async function fetchSingleQuote(symbol) {
 }
 
 /**
- * Obtener datos de gráfico intradiario cada 30 minutos para la jornada del día
+ * Obtener datos de gráfico intradiario cada 30 minutos con OHLC completo (Open, High, Low, Close)
  */
 async function getIntradayChartData(symbol) {
   const sym = symbol ? symbol.trim().toUpperCase() : 'TSLA';
@@ -65,18 +65,32 @@ async function getIntradayChartData(symbol) {
       const result = response.data.chart.result[0];
       const meta = result.meta;
       const timestamps = result.timestamp || [];
-      const quotes = result.indicators.quote[0] ? result.indicators.quote[0].close || [] : [];
-      const prevClose = meta.chartPreviousClose || meta.previousClose || (quotes[0] || 100);
+      const quote = result.indicators.quote[0] || {};
+
+      const opens = quote.open || [];
+      const highs = quote.high || [];
+      const lows = quote.low || [];
+      const closes = quote.close || [];
+
+      const prevClose = meta.chartPreviousClose || meta.previousClose || (closes[0] || 100);
 
       const points = [];
       timestamps.forEach((ts, idx) => {
-        const val = quotes[idx];
-        if (val !== null && val !== undefined) {
+        const c = closes[idx];
+        if (c !== null && c !== undefined) {
+          const o = opens[idx] !== null && opens[idx] !== undefined ? opens[idx] : c;
+          const h = highs[idx] !== null && highs[idx] !== undefined ? highs[idx] : Math.max(o, c);
+          const l = lows[idx] !== null && lows[idx] !== undefined ? lows[idx] : Math.min(o, c);
+
           const dateObj = new Date(ts * 1000);
           const timeLabel = dateObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
           points.push({
             time: timeLabel,
-            price: Number(val.toFixed(2)),
+            open: Number(o.toFixed(2)),
+            high: Number(h.toFixed(2)),
+            low: Number(l.toFixed(2)),
+            close: Number(c.toFixed(2)),
+            price: Number(c.toFixed(2)),
             timestamp: ts
           });
         }
@@ -85,7 +99,7 @@ async function getIntradayChartData(symbol) {
       return {
         symbol: sym,
         prevClose: Number(prevClose.toFixed(2)),
-        currentPrice: meta.regularMarketPrice ? Number(meta.regularMarketPrice.toFixed(2)) : (points.length > 0 ? points[points.length - 1].price : prevClose),
+        currentPrice: meta.regularMarketPrice ? Number(meta.regularMarketPrice.toFixed(2)) : (points.length > 0 ? points[points.length - 1].close : prevClose),
         points: points
       };
     }
@@ -93,13 +107,25 @@ async function getIntradayChartData(symbol) {
     console.warn(`Error al consultar gráfico intradiario para ${sym}:`, err.message);
   }
 
-  // Generador de fallback intradiario resiliente en caso de red cerrada
+  // Fallback intradiario resiliente
   const fallbackPoints = [];
   const times = ['09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00'];
   let basePrice = 300.0;
   times.forEach(t => {
-    basePrice += (Math.random() - 0.48) * 2;
-    fallbackPoints.push({ time: t, price: Number(basePrice.toFixed(2)) });
+    const o = basePrice;
+    const change = (Math.random() - 0.48) * 3;
+    const c = o + change;
+    const h = Math.max(o, c) + Math.random() * 1.5;
+    const l = Math.min(o, c) - Math.random() * 1.5;
+    basePrice = c;
+    fallbackPoints.push({
+      time: t,
+      open: Number(o.toFixed(2)),
+      high: Number(h.toFixed(2)),
+      low: Number(l.toFixed(2)),
+      close: Number(c.toFixed(2)),
+      price: Number(c.toFixed(2))
+    });
   });
 
   return {

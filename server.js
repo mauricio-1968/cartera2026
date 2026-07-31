@@ -390,11 +390,104 @@ app.get('/api/prices', async (req, res) => {
   res.json(prices);
 });
 
-// 8. Gráfico intradiario (cada 30 min)
+// 6b. Endpoint de gráfico intradiario (cada 30 min)
 app.get('/api/chart/intraday', async (req, res) => {
   const symbol = req.query.symbol || 'TSLA';
   const data = await getIntradayChartData(symbol);
   res.json(data);
+});
+
+// 6c. Endpoint de gráfico histórico de la cartera (Valor Total vs Tiempo)
+app.get('/api/chart/historical-portfolio', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+
+  db.all('SELECT * FROM transactions WHERE user_id = ? ORDER BY buy_date ASC, id ASC', [userId], async (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    if (!rows || rows.length === 0) {
+      return res.json({ timeline: [] });
+    }
+
+    const openSymbols = [...new Set(rows.filter(r => r.status === 'open').map(r => r.symbol))];
+    const livePrices = await getStockPrices(openSymbols);
+
+    // Agrupar operaciones por fecha
+    const dateMap = {};
+    let cumInvested = 0;
+    let cumRealizedGain = 0;
+
+    rows.forEach(r => {
+      const dStr = r.buy_date || new Date().toISOString().split('T')[0];
+      if (!dateMap[dStr]) {
+        dateMap[dStr] = { date: dStr, invested: 0, closedGain: 0, items: [] };
+      }
+      dateMap[dStr].items.push(r);
+    });
+
+    const datesSorted = Object.keys(dateMap).sort();
+    const timeline = [];
+
+    // Calcular valuaciones evolutivas
+    let currentInvested = 0;
+    let currentRealized = 0;
+    const activeHoldings = {}; // symbol -> { qty, buyTotal }
+
+    datesSorted.forEach(dStr => {
+      const dayData = dateMap[dStr];
+
+      dayData.items.forEach(item => {
+        if (item.status === 'open') {
+          currentInvested += (item.buy_total || 0);
+          if (!activeHoldings[item.symbol]) {
+            activeHoldings[item.symbol] = { qty: 0, total: 0 };
+          }
+          activeHoldings[item.symbol].qty += item.quantity;
+          activeHoldings[item.symbol].total += item.buy_total;
+        } else if (item.status === 'closed') {
+          currentRealized += (item.realized_gain || 0);
+        }
+      });
+
+      // Calcular valor de las posiciones abiertas a la fecha o precio actual
+      let valAtDate = 0;
+      Object.keys(activeHoldings).forEach(sym => {
+        const holding = activeHoldings[sym];
+        const live = livePrices[sym];
+        const price = live ? live.price : (holding.qty > 0 ? holding.total / holding.qty : 100);
+        valAtDate += holding.qty * price;
+      });
+
+      timeline.push({
+        date: dStr,
+        invested: Number(currentInvested.toFixed(2)),
+        realizedGain: Number(currentRealized.toFixed(2)),
+        totalValue: Number((valAtDate + currentRealized).toFixed(2)),
+        netGain: Number((valAtDate + currentRealized - currentInvested).toFixed(2))
+      });
+    });
+
+    // Agregar hito final (Hoy) si la última fecha no es hoy
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (timeline.length > 0 && timeline[timeline.length - 1].date !== todayStr) {
+      let finalVal = 0;
+      Object.keys(activeHoldings).forEach(sym => {
+        const holding = activeHoldings[sym];
+        const live = livePrices[sym];
+        const price = live ? live.price : (holding.qty > 0 ? holding.total / holding.qty : 100);
+        finalVal += holding.qty * price;
+      });
+
+      timeline.push({
+        date: todayStr + ' (Hoy)',
+        invested: Number(currentInvested.toFixed(2)),
+        realizedGain: Number(currentRealized.toFixed(2)),
+        totalValue: Number((finalVal + currentRealized).toFixed(2)),
+        netGain: Number((finalVal + currentRealized - currentInvested).toFixed(2))
+      });
+    }
+
+    res.json({ timeline });
+  });
 });
 
 // 9. Importar archivo Excel o CSV para el usuario autenticado

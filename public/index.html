@@ -118,20 +118,44 @@
 
       <!-- Dashboard Layout con Ticker Vertical -->
       <div class="dashboard-layout">
-        <!-- Columna Izquierda: Gráfico Lineal Intradiario y Noticias -->
+        <!-- Columna Izquierda: Gráfico Lineal/Velas Intradiario, Gráfico Histórico y Noticias -->
         <div class="dashboard-left">
+          <!-- CARD 1: GRÁFICO INTRADIARIO (LÍNEA VS VELAS JAPONESAS) -->
           <div class="card" style="margin-bottom: 24px;">
             <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
               <span>📈 Evolución Intradiaria del Precio (Cada 30 min - Hoy)</span>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <label style="font-size: 12px; color: var(--text-muted);">Acción:</label>
-                <select id="chart-stock-select" class="form-input" style="padding: 4px 10px; font-size: 13px; width: auto; font-weight: bold;" onchange="app.changeIntradaySymbol(this.value)">
-                  <!-- Opciones dinámicas -->
-                </select>
+              <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <!-- Selector de Estilo de Gráfico -->
+                <div style="display: flex; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 2px; border: 1px solid var(--border-color);">
+                  <button type="button" id="btn-chart-style-line" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="app.setChartStyle('line')">
+                    📈 Línea
+                  </button>
+                  <button type="button" id="btn-chart-style-candle" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="app.setChartStyle('candle')">
+                    🕯️ Velas Japonesas
+                  </button>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <label style="font-size: 12px; color: var(--text-muted);">Acción:</label>
+                  <select id="chart-stock-select" class="form-input" style="padding: 4px 10px; font-size: 13px; width: auto; font-weight: bold;" onchange="app.changeIntradaySymbol(this.value)">
+                    <!-- Opciones dinámicas -->
+                  </select>
+                </div>
               </div>
             </div>
             <div class="chart-container">
               <canvas id="chart-intraday-line"></canvas>
+            </div>
+          </div>
+
+          <!-- CARD 2: NUEVO GRÁFICO DE EVOLUCIÓN HISTÓRICA (VALOR TOTAL VS TIEMPO) -->
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>📈 Evolución Histórica de la Cartera (Valor Total vs Tiempo)</span>
+              <span style="font-size: 11px; font-weight: normal; color: #10b981;">Ganancia / Pérdida Acumulada Real</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="chart-historical-line"></canvas>
             </div>
           </div>
 
