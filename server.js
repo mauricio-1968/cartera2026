@@ -596,13 +596,13 @@ app.get('/api/export-excel', authenticateToken, (req, res) => {
     const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="Cartera_Acciones_Export.xlsx"');
+    res.setHeader('Content-Disposition', 'attachment; filename="Portrack_Cartera_Export.xlsx"');
     res.send(buffer);
   });
 });
 
 app.listen(PORT, () => {
   console.log(`====================================================`);
-  console.log(`🚀 Servidor Cartera de Acciones corriendo en: http://localhost:${PORT}`);
+  console.log(`🚀 Servidor Portrack corriendo en: http://localhost:${PORT}`);
   console.log(`====================================================`);
 });
