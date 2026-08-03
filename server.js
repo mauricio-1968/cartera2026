@@ -138,8 +138,8 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: err.message });
     }
 
-    const openRows = rows.filter(r => r.status === 'open');
-    const closedRows = rows.filter(r => r.status === 'closed');
+    const openRows = rows.filter(r => r.status === 'open' && (!r.sell_price || r.sell_price === 0));
+    const closedRows = rows.filter(r => r.status === 'closed' || (r.sell_price && r.sell_price > 0));
 
     const openSymbols = openRows.map(r => r.symbol);
     const livePrices = await getStockPrices(openSymbols);
@@ -306,12 +306,14 @@ app.post('/api/transactions/sell', authenticateToken, (req, res) => {
     return res.status(400).json({ error: 'ID de transacción y precio de venta son requeridos' });
   }
 
-  db.get('SELECT * FROM transactions WHERE id = ? AND user_id = ?', [id, userId], (err, row) => {
+  const targetId = parseInt(id);
+  const sPrice = parseFloat(sell_price);
+  const sDate = sell_date || new Date().toISOString().split('T')[0];
+
+  db.get('SELECT * FROM transactions WHERE id = ? AND user_id = ?', [targetId, userId], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ error: 'Posición no encontrada' });
 
-    const sPrice = parseFloat(sell_price);
-    const sDate = sell_date || new Date().toISOString().split('T')[0];
     const sQty = row.quantity;
     const sellTotal = sQty * sPrice;
     const realizedGain = sellTotal - row.buy_total;
@@ -336,9 +338,9 @@ app.post('/api/transactions/sell', authenticateToken, (req, res) => {
       WHERE id = ? AND user_id = ?
     `;
 
-    db.run(sql, [sDate, sQty, sPrice, sellTotal, realizedGain, daysHeld, returnPercent, notes || row.notes, id, userId], function(err) {
+    db.run(sql, [sDate, sQty, sPrice, sellTotal, realizedGain, daysHeld, returnPercent, notes || row.notes, targetId, userId], function(err) {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ message: 'Venta realizada y posición cerrada con éxito', id });
+      res.json({ message: 'Venta realizada y posición cerrada con éxito', id: targetId });
     });
   });
 });
