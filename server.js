@@ -138,8 +138,8 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: err.message });
     }
 
-    const openRows = rows.filter(r => r.status === 'open' && (!r.sell_price || r.sell_price === 0));
-    const closedRows = rows.filter(r => r.status === 'closed' || (r.sell_price && r.sell_price > 0));
+    const openRows = rows.filter(r => r.status === 'open');
+    const closedRows = rows.filter(r => r.status === 'closed');
 
     const openSymbols = openRows.map(r => r.symbol);
     const livePrices = await getStockPrices(openSymbols);
