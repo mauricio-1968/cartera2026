@@ -13,7 +13,7 @@ const tickerMap = {
   'AOCL': 'AOCL',
   'APLD': 'APLD',
   'APP': 'APP',
-  'APPS': 'APP',
+  'APPS': 'APPS',
   'BLZE': 'BLZE',
   'CSCO': 'CSCO',
   'CUE BIO': 'CUE',
