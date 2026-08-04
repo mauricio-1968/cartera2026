@@ -4,19 +4,52 @@
    ========================================================== */
 
 :root {
-  --bg-dark: #0b0f19;
-  --bg-card: #141b2d;
-  --bg-card-hover: #1c263e;
-  --border-color: rgba(255, 255, 255, 0.08);
+  --bg-dark: #090d16;
+  --card-bg: #0e1726;
+  --card-hover: #152238;
   --text-main: #f3f4f6;
   --text-muted: #9ca3af;
   --primary: #3b82f6;
   --primary-hover: #2563eb;
   --success: #10b981;
-  --success-bg: rgba(16, 185, 129, 0.15);
   --danger: #ef4444;
-  --danger-bg: rgba(239, 68, 68, 0.15);
   --warning: #f59e0b;
+  --border-color: rgba(255, 255, 255, 0.08);
+}
+
+body.light-theme {
+  --bg-dark: #f8fafc;
+  --card-bg: #ffffff;
+  --card-hover: #f1f5f9;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --success: #059669;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --border-color: #e2e8f0;
+}
+
+body.light-theme .card,
+body.light-theme .stat-card,
+body.light-theme .app-header,
+body.light-theme .modal-box {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+body.light-theme .data-table th {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+body.light-theme .data-table tr:hover {
+  background: #f8fafc;
+}
+
+:root {
+  --success-bg: rgba(16, 185, 129, 0.15);
+  --danger-bg: rgba(239, 68, 68, 0.15);
   --accent-purple: #8b5cf6;
   --radius: 12px;
   --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);

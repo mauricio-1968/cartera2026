@@ -43,6 +43,11 @@
           </button>
         </div>
 
+        <!-- Botón de Alternar Modo Claro / Oscuro -->
+        <button class="btn btn-secondary" id="btn-theme-toggle" onclick="app.toggleTheme()">
+          <span id="theme-icon">☀️</span> <span id="theme-text">Modo Claro</span>
+        </button>
+
         <button class="btn btn-secondary" onclick="app.refreshData()">
           <span id="refresh-spinner">🔄</span> Actualizar Precios
         </button>
@@ -120,10 +125,10 @@
       <div class="dashboard-layout">
         <!-- Columna Izquierda: Gráfico Lineal/Velas Intradiario, Gráfico Histórico y Noticias -->
         <div class="dashboard-left">
-          <!-- CARD 1: GRÁFICO INTRADIARIO (LÍNEA VS VELAS JAPONESAS) -->
+          <!-- CARD 1: GRÁFICO INTRADIARIO (LÍNEA VS VELAS JAPONESAS VS VOLUMEN) -->
           <div class="card" style="margin-bottom: 24px;">
             <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-              <span>📈 Evolución Intradiaria del Precio (Cada 30 min - Hoy)</span>
+              <span>📈 Evolución Intradiaria del Precio y Volumen (Cada 30 min - Hoy)</span>
               <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <!-- Selector de Estilo de Gráfico -->
                 <div style="display: flex; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 2px; border: 1px solid var(--border-color);">
@@ -132,6 +137,9 @@
                   </button>
                   <button type="button" id="btn-chart-style-candle" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="app.setChartStyle('candle')">
                     🕯️ Velas Japonesas
+                  </button>
+                  <button type="button" id="btn-chart-volume" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px; margin-left: 4px;" onclick="app.toggleVolume()">
+                    📊 Volumen (<span id="volume-status-text">ON</span>)
                   </button>
                 </div>
 

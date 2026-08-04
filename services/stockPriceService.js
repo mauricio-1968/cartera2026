@@ -47,7 +47,7 @@ async function fetchSingleQuote(symbol) {
 }
 
 /**
- * Obtener datos de gráfico intradiario cada 30 minutos alineados al horario de la Bolsa de EE.UU. (America/New_York)
+ * Obtener datos de gráfico intradiario cada 30 minutos con OHLC y VOLUMEN de acciones transadas
  */
 async function getIntradayChartData(symbol) {
   const sym = symbol ? symbol.trim().toUpperCase() : 'TSLA';
@@ -71,6 +71,7 @@ async function getIntradayChartData(symbol) {
       const highs = quote.high || [];
       const lows = quote.low || [];
       const closes = quote.close || [];
+      const volumes = quote.volume || [];
 
       const prevClose = meta.chartPreviousClose || meta.previousClose || (closes[0] || 100);
 
@@ -81,9 +82,9 @@ async function getIntradayChartData(symbol) {
           const o = opens[idx] !== null && opens[idx] !== undefined ? opens[idx] : c;
           const h = highs[idx] !== null && highs[idx] !== undefined ? highs[idx] : Math.max(o, c);
           const l = lows[idx] !== null && lows[idx] !== undefined ? lows[idx] : Math.min(o, c);
+          const v = volumes[idx] !== null && volumes[idx] !== undefined ? volumes[idx] : 0;
 
           const dateObj = new Date(ts * 1000);
-          // Formatear hora exacta en zona horaria de la Bolsa de Nueva York (Wall Street)
           const timeLabel = dateObj.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
@@ -98,6 +99,7 @@ async function getIntradayChartData(symbol) {
             low: Number(l.toFixed(2)),
             close: Number(c.toFixed(2)),
             price: Number(c.toFixed(2)),
+            volume: v,
             timestamp: ts
           });
         }
@@ -114,7 +116,7 @@ async function getIntradayChartData(symbol) {
     console.warn(`Error al consultar gráfico intradiario para ${sym}:`, err.message);
   }
 
-  // Fallback intradiario con horas de Wall Street (09:30 a 16:00)
+  // Fallback intradiario con volumen simulado
   const fallbackPoints = [];
   const times = ['09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00'];
   let basePrice = 300.0;
@@ -124,6 +126,7 @@ async function getIntradayChartData(symbol) {
     const c = o + change;
     const h = Math.max(o, c) + Math.random() * 1.5;
     const l = Math.min(o, c) - Math.random() * 1.5;
+    const v = Math.floor(Math.random() * 2000000) + 500000;
     basePrice = c;
     fallbackPoints.push({
       time: t,
@@ -131,7 +134,8 @@ async function getIntradayChartData(symbol) {
       high: Number(h.toFixed(2)),
       low: Number(l.toFixed(2)),
       close: Number(c.toFixed(2)),
-      price: Number(c.toFixed(2))
+      price: Number(c.toFixed(2)),
+      volume: v
     });
   });
 

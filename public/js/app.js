@@ -6,6 +6,8 @@ const app = {
   selectedIntradaySymbol: 'TSLA',
 
   async init() {
+    this.initTheme();
+
     const todayStr = new Date().toISOString().split('T')[0];
     const buyDateElem = document.getElementById('buy-date');
     const sellDateElem = document.getElementById('sell-date');
@@ -291,6 +293,58 @@ const app = {
     document.getElementById('modal-news').classList.remove('active');
   },
 
+  theme: 'dark',
+  showVolume: true,
+
+  initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    this.theme = savedTheme;
+    if (savedTheme === 'light') {
+      document.body.classList.add('light-theme');
+      this.updateThemeButton(true);
+    } else {
+      document.body.classList.remove('light-theme');
+      this.updateThemeButton(false);
+    }
+  },
+
+  toggleTheme() {
+    const isLight = document.body.classList.toggle('light-theme');
+    this.theme = isLight ? 'light' : 'dark';
+    localStorage.setItem('theme', this.theme);
+    this.updateThemeButton(isLight);
+
+    if (this.data && this.data.openPositions) {
+      this.renderCharts(this.data.openPositions);
+    }
+  },
+
+  updateThemeButton(isLight) {
+    const icon = document.getElementById('theme-icon');
+    const text = document.getElementById('theme-text');
+    if (icon && text) {
+      if (isLight) {
+        icon.innerText = '🌙';
+        text.innerText = 'Modo Oscuro';
+      } else {
+        icon.innerText = '☀️';
+        text.innerText = 'Modo Claro';
+      }
+    }
+  },
+
+  toggleVolume() {
+    this.showVolume = !this.showVolume;
+    const txt = document.getElementById('volume-status-text');
+    const btn = document.getElementById('btn-chart-volume');
+    if (txt) txt.innerText = this.showVolume ? 'ON' : 'OFF';
+    if (btn) {
+      btn.style.background = this.showVolume ? 'var(--primary)' : 'transparent';
+      btn.style.color = this.showVolume ? '#fff' : 'var(--text-muted)';
+    }
+    this.fetchAndRenderIntradayChart(this.selectedIntradaySymbol);
+  },
+
   intradayChartStyle: 'line', // 'line' o 'candle'
 
   setChartStyle(style) {
@@ -346,126 +400,36 @@ const app = {
 
       const points = data.points || [];
       const labels = points.map(p => p.time);
+      const volumes = points.map(p => p.volume || 0);
+
+      const maxVol = Math.max(...volumes, 1);
+      const volColors = points.map(p => p.close >= p.open ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)');
 
       if (this.charts.intraday) this.charts.intraday.destroy();
 
+      const isLight = document.body.classList.contains('light-theme');
+      const gridColor = isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.04)';
+      const tickColor = isLight ? '#475569' : '#9ca3af';
+
+      const datasets = [];
+
       if (this.intradayChartStyle === 'candle') {
-        // ==========================================
-        // RENDERIZADO DE VELAS JAPONESAS (CANDLESTICK ALTA VISIBILIDAD)
-        // ==========================================
-        const allLows = points.map(p => p.low);
-        const allHighs = points.map(p => p.high);
-        const minPrice = Math.min(...allLows);
-        const maxPrice = Math.max(...allHighs);
-        const padding = (maxPrice - minPrice) * 0.05 || 1.0;
-
-        const yMin = Math.floor((minPrice - padding) * 100) / 100;
-        const yMax = Math.ceil((maxPrice + padding) * 100) / 100;
-
         const barRanges = points.map(p => [p.low, p.high]);
-
-        // Plugin optimizado de dibujo de velas con nitidez neón
-        const candlePlugin = {
-          id: 'candlePlugin',
-          beforeDatasetsDraw(chart) {
-            const { ctx, scales: { x, y } } = chart;
-            points.forEach((p, i) => {
-              const xPos = x.getPixelForValue(i);
-              const highY = y.getPixelForValue(p.high);
-              const lowY = y.getPixelForValue(p.low);
-              const openY = y.getPixelForValue(p.open);
-              const closeY = y.getPixelForValue(p.close);
-              const isGreen = p.close >= p.open;
-              const color = isGreen ? '#10b981' : '#ef4444';
-              const strokeBorder = isGreen ? '#059669' : '#dc2626';
-
-              // 1. Mecha (Wick) de la vela (High a Low) - Grosor 2px
-              ctx.save();
-              ctx.strokeStyle = color;
-              ctx.lineWidth = 2;
-              ctx.beginPath();
-              ctx.moveTo(xPos, highY);
-              ctx.lineTo(xPos, lowY);
-              ctx.stroke();
-
-              // 2. Cuerpo de la vela (Open a Close) - Ancho 14px
-              const topY = Math.min(openY, closeY);
-              const bodyHeight = Math.max(Math.abs(closeY - openY), 3); // Mínimo 3px
-              const candleWidth = 14;
-
-              ctx.fillStyle = color;
-              ctx.fillRect(xPos - candleWidth / 2, topY, candleWidth, bodyHeight);
-
-              ctx.strokeStyle = strokeBorder;
-              ctx.lineWidth = 1;
-              ctx.strokeRect(xPos - candleWidth / 2, topY, candleWidth, bodyHeight);
-
-              ctx.restore();
-            });
-          }
-        };
-
-        this.charts.intraday = new Chart(ctx, {
+        datasets.push({
           type: 'bar',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: `${symbol} (Velas)`,
-              data: barRanges,
-              backgroundColor: 'transparent',
-              borderColor: 'transparent'
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: {
-                ticks: { color: '#9ca3af', font: { family: 'Outfit', size: 11 } },
-                grid: { color: 'rgba(255,255,255,0.04)' }
-              },
-              y: {
-                min: yMin,
-                max: yMax,
-                ticks: {
-                  color: '#9ca3af',
-                  font: { family: 'Outfit', size: 11 },
-                  callback: function(v) { return '$' + v.toFixed(2); }
-                },
-                grid: { color: 'rgba(255,255,255,0.04)' }
-              }
-            },
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    const p = points[context.dataIndex];
-                    return [
-                      `Hora: ${p.time} (NY)`,
-                      `Apertura: $${p.open.toFixed(2)}`,
-                      `Máximo: $${p.high.toFixed(2)}`,
-                      `Mínimo: $${p.low.toFixed(2)}`,
-                      `Cierre: $${p.close.toFixed(2)}`
-                    ];
-                  }
-                }
-              }
-            }
-          },
-          plugins: [candlePlugin]
+          label: `${symbol} (Velas)`,
+          data: barRanges,
+          backgroundColor: 'transparent',
+          borderColor: 'transparent',
+          yAxisID: 'y'
         });
-
       } else {
-        // ==========================================
-        // RENDERIZADO DE GRÁFICO LINEAL
-        // ==========================================
         const prices = points.map(p => p.close || p.price);
         const firstPrice = data.prevClose || (prices[0] || 100);
         const lastPrice = data.currentPrice || (prices[prices.length - 1] || firstPrice);
         const isPositive = lastPrice >= firstPrice;
 
-        const strokeColor = isPositive ? '#10b981' : '#ef4444';
+        const strokeColor = isPositive ? (isLight ? '#059669' : '#10b981') : (isLight ? '#dc2626' : '#ef4444');
         const bgGradient = ctx.createLinearGradient(0, 0, 0, 260);
         if (isPositive) {
           bgGradient.addColorStop(0, 'rgba(16, 185, 129, 0.3)');
@@ -475,54 +439,152 @@ const app = {
           bgGradient.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
         }
 
-        this.charts.intraday = new Chart(ctx, {
+        datasets.push({
           type: 'line',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: `${symbol} (US$)`,
-              data: prices,
-              borderColor: strokeColor,
-              borderWidth: 3,
-              backgroundColor: bgGradient,
-              fill: true,
-              tension: 0.35,
-              pointBackgroundColor: strokeColor,
-              pointBorderColor: '#fff',
-              pointRadius: 4,
-              pointHoverRadius: 7
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: {
-                ticks: { color: '#9ca3af', font: { family: 'Outfit', size: 11 } },
-                grid: { color: 'rgba(255,255,255,0.04)' }
-              },
-              y: {
-                ticks: {
-                  color: '#9ca3af',
-                  font: { family: 'Outfit', size: 11 },
-                  callback: function(value) { return '$' + value.toFixed(2); }
-                },
-                grid: { color: 'rgba(255,255,255,0.04)' }
-              }
+          label: `${symbol} (US$)`,
+          data: prices,
+          borderColor: strokeColor,
+          borderWidth: 3,
+          backgroundColor: bgGradient,
+          fill: true,
+          tension: 0.35,
+          pointBackgroundColor: strokeColor,
+          pointBorderColor: '#fff',
+          pointRadius: 4,
+          pointHoverRadius: 7,
+          yAxisID: 'y'
+        });
+      }
+
+      // Dataset de Volumen de Acciones Transadas (Si está activo)
+      if (this.showVolume) {
+        datasets.push({
+          type: 'bar',
+          label: 'Volumen Transado',
+          data: volumes,
+          backgroundColor: volColors,
+          borderColor: volColors,
+          borderWidth: 1,
+          yAxisID: 'yVolume'
+        });
+      }
+
+      const allLows = points.map(p => p.low || p.price);
+      const allHighs = points.map(p => p.high || p.price);
+      const minPrice = Math.min(...allLows);
+      const maxPrice = Math.max(...allHighs);
+      const padding = (maxPrice - minPrice) * 0.05 || 1.0;
+
+      const yMin = Math.floor((minPrice - padding) * 100) / 100;
+      const yMax = Math.ceil((maxPrice + padding) * 100) / 100;
+
+      const candlePlugin = {
+        id: 'candlePlugin',
+        beforeDatasetsDraw(chart) {
+          if (app.intradayChartStyle !== 'candle') return;
+          const { ctx, scales: { x, y } } = chart;
+          points.forEach((p, i) => {
+            const xPos = x.getPixelForValue(i);
+            const highY = y.getPixelForValue(p.high);
+            const lowY = y.getPixelForValue(p.low);
+            const openY = y.getPixelForValue(p.open);
+            const closeY = y.getPixelForValue(p.close);
+            const isGreen = p.close >= p.open;
+            const color = isGreen ? '#10b981' : '#ef4444';
+            const strokeBorder = isGreen ? '#059669' : '#dc2626';
+
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(xPos, highY);
+            ctx.lineTo(xPos, lowY);
+            ctx.stroke();
+
+            const topY = Math.min(openY, closeY);
+            const bodyHeight = Math.max(Math.abs(closeY - openY), 3);
+            const candleWidth = 14;
+
+            ctx.fillStyle = color;
+            ctx.fillRect(xPos - candleWidth / 2, topY, candleWidth, bodyHeight);
+
+            ctx.strokeStyle = strokeBorder;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(xPos - candleWidth / 2, topY, candleWidth, bodyHeight);
+
+            ctx.restore();
+          });
+        }
+      };
+
+      this.charts.intraday = new Chart(ctx, {
+        data: {
+          labels: labels,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              ticks: { color: tickColor, font: { family: 'Outfit', size: 11 } },
+              grid: { color: gridColor }
             },
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    return `Precio: $${context.raw.toFixed(2)}`;
+            y: {
+              type: 'linear',
+              position: 'left',
+              min: yMin,
+              max: yMax,
+              ticks: {
+                color: tickColor,
+                font: { family: 'Outfit', size: 11 },
+                callback: function(v) { return '$' + v.toFixed(2); }
+              },
+              grid: { color: gridColor }
+            },
+            yVolume: {
+              type: 'linear',
+              position: 'right',
+              display: false,
+              min: 0,
+              max: maxVol * 4 // Mantiene las barras de volumen en el 25% inferior del gráfico
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const p = points[context.dataIndex];
+                  const volStr = p.volume ? p.volume.toLocaleString('es-ES') + ' acciones' : '0 acciones';
+                  if (app.intradayChartStyle === 'candle') {
+                    if (context.datasetIndex === 0) {
+                      return [
+                        `Hora: ${p.time} (NY)`,
+                        `Apertura: $${p.open.toFixed(2)}`,
+                        `Máximo: $${p.high.toFixed(2)}`,
+                        `Mínimo: $${p.low.toFixed(2)}`,
+                        `Cierre: $${p.close.toFixed(2)}`,
+                        `Volumen Transado: ${volStr}`
+                      ];
+                    }
+                  } else {
+                    if (context.datasetIndex === 0) {
+                      return [
+                        `Hora: ${p.time} (NY)`,
+                        `Precio Cierre: $${p.close.toFixed(2)}`,
+                        `Volumen Transado: ${volStr}`
+                      ];
+                    }
                   }
+                  return `Volumen Transado: ${volStr}`;
                 }
               }
             }
           }
-        });
-      }
+        },
+        plugins: [candlePlugin]
+      });
 
     } catch (err) {
       console.error('Error renderizando gráfico intradiario:', err);
