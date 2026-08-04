@@ -12,6 +12,8 @@ const tickerMap = {
   'AMZN': 'AMZN',
   'AOCL': 'AOCL',
   'APLD': 'APLD',
+  'APP': 'APP',
+  'APPS': 'APP',
   'BLZE': 'BLZE',
   'CSCO': 'CSCO',
   'CUE BIO': 'CUE',
