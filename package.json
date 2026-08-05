@@ -1,7 +1,7 @@
 {
-  "name": "stock-portfolio-app",
+  "name": "portrack",
   "version": "1.0.0",
-  "description": "Sistema de Administración de Cartera de Acciones en Tiempo Real para PC y Tablet Android",
+  "description": "Portrack - Sistema de Administración de Cartera de Acciones e Inteligencia de Trading Multi-Usuario",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,9 +9,6 @@
     "init-db": "node database/initDb.js"
   },
   "dependencies": {
-    "@capacitor/android": "^8.4.2",
-    "@capacitor/cli": "^8.4.2",
-    "@capacitor/core": "^8.4.2",
     "axios": "^1.7.9",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
@@ -21,5 +18,10 @@
     "pg": "^8.22.0",
     "sqlite3": "^5.1.7",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/cli": "^8.4.2",
+    "@capacitor/core": "^8.4.2"
   }
 }
