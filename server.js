@@ -612,8 +612,10 @@ app.get('/api/export-excel', authenticateToken, (req, res) => {
   });
 });
 
-app.listen(PORT, '127.0.0.1', () => {
+const HOST = '0.0.0.0';
+
+app.listen(PORT, HOST, () => {
   console.log(`====================================================`);
-  console.log(`🚀 Servidor Portrack corriendo LOCALMENTE en: http://127.0.0.1:${PORT}`);
+  console.log(`🚀 Servidor Portrack corriendo exitosamente en: http://${HOST}:${PORT}`);
   console.log(`====================================================`);
 });
