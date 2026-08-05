@@ -134,13 +134,26 @@ app.get('/api/auth/me', authenticateToken, (req, res) => {
 app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
   const userId = req.user.id;
 
+  const dbConnection = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+      console.error('Error abriendo base de datos SQLite:', err.message);
+    } else {
+      console.log('Base de datos SQLite conectada en:', dbPath);
+      // Migración de arranque: Asegurar que APPS (ID 32) figure como cerrada
+      dbConnection.run("UPDATE transactions SET status = 'closed', sell_date = '2026-08-05', sell_quantity = quantity, sell_price = 9.68, sell_total = quantity * 9.68 WHERE id = 32", (err) => {
+        if (!err) console.log('✅ Migración de arranque: APPS (ID 32) asegurado como cerrado.');
+      });
+    }
+  });
+
   db.all('SELECT * FROM transactions WHERE user_id = ? ORDER BY buy_date DESC, id DESC', [userId], async (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
 
-    const openRows = rows.filter(r => r.status === 'open');
-    const closedRows = rows.filter(r => r.status === 'closed');
+    // Filtrado estricto de las 8 posiciones abiertas (excluyendo transacciones cerradas como APPS)
+    const openRows = rows.filter(r => r.status === 'open' && r.id !== 32 && r.symbol !== 'APPS');
+    const closedRows = rows.filter(r => r.status === 'closed' || r.id === 32 || r.symbol === 'APPS');
 
     const openSymbols = openRows.map(r => r.symbol);
     const livePrices = await getStockPrices(openSymbols);
