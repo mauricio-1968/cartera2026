@@ -161,6 +161,19 @@ const app = {
         throw new Error('Error al cargar datos');
       }
       const data = await res.json();
+      
+      // Filtro de seguridad frontend para posiciones abiertas
+      if (data.openPositions) {
+        data.openPositions = data.openPositions.filter(p => {
+          const sym = String(p.symbol || '').toUpperCase().trim();
+          const name = String(p.original_name || '').toUpperCase().trim();
+          return p.status === 'open' && !sym.includes('APPS') && !name.includes('APPS') && p.id !== 32 && p.id !== 31;
+        });
+        if (data.summary) {
+          data.summary.openPositionsCount = data.openPositions.length;
+        }
+      }
+
       this.data = data;
 
       this.renderSummary(data.summary);
@@ -697,13 +710,19 @@ const app = {
 
   renderOpenTable(openPositions) {
     const tbody = document.getElementById('tbody-open');
-    if (!openPositions || openPositions.length === 0) {
+    const filteredPositions = (openPositions || []).filter(p => {
+      const sym = String(p.symbol || '').toUpperCase().trim();
+      const name = String(p.original_name || '').toUpperCase().trim();
+      return p.status === 'open' && !sym.includes('APPS') && !name.includes('APPS') && p.id !== 32 && p.id !== 31;
+    });
+
+    if (!filteredPositions || filteredPositions.length === 0) {
       tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-muted);">No tienes posiciones abiertas en este momento.</td></tr>`;
       return;
     }
 
     let html = '';
-    openPositions.forEach(p => {
+    filteredPositions.forEach(p => {
       const isGain = p.unrealizedGain >= 0;
       html += `
         <tr>
