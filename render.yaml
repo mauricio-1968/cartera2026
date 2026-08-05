@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: portrack
+    env: node
+    plan: free
+    buildCommand: npm install --only=production --no-audit --no-fund
+    startCommand: npm start
