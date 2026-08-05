@@ -139,9 +139,16 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: err.message });
     }
 
+    // Función estricta para identificar la transacción de APPS
+    const isApps = (r) => {
+      const s = String(r.symbol || '').toUpperCase().trim();
+      const n = String(r.original_name || '').toUpperCase().trim();
+      return s.includes('APPS') || n.includes('APPS') || r.id === 32 || r.id === 31 || (r.sell_price && r.sell_price > 0);
+    };
+
     // Filtrado estricto de las 8 posiciones abiertas (excluyendo transacciones cerradas como APPS)
-    const openRows = rows.filter(r => r.status === 'open' && r.id !== 32 && r.symbol !== 'APPS');
-    const closedRows = rows.filter(r => r.status === 'closed' || r.id === 32 || r.symbol === 'APPS');
+    const openRows = rows.filter(r => r.status === 'open' && !isApps(r));
+    const closedRows = rows.filter(r => r.status === 'closed' || isApps(r));
 
     const openSymbols = openRows.map(r => r.symbol);
     const livePrices = await getStockPrices(openSymbols);
