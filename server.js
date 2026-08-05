@@ -14,7 +14,7 @@ const { getPortfolioNews } = require('./services/newsService');
 const { analyzePositionForecast } = require('./services/forecastService');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'cartera_secret_key_2026';
 
 app.use(cors());
@@ -603,8 +603,8 @@ app.get('/api/export-excel', authenticateToken, (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '127.0.0.1', () => {
   console.log(`====================================================`);
-  console.log(`🚀 Servidor Portrack corriendo en: http://localhost:${PORT}`);
+  console.log(`🚀 Servidor Portrack corriendo LOCALMENTE en: http://127.0.0.1:${PORT}`);
   console.log(`====================================================`);
 });
