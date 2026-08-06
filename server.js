@@ -1,15 +1,14 @@
 const express = require('express');
-// Portrack Server v1.0.5 - Clean Open Positions Sync
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const sqlite3 = require('sqlite3').verbose();
 const multer = require('multer');
 const xlsx = require('xlsx');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-const { initDb, dbPath, tickerMap } = require('./database/initDb');
+const db = require('./database/dbAdapter');
+const { initDb, tickerMap } = require('./database/initDb');
 const { getStockPrices, getIntradayChartData } = require('./services/stockPriceService');
 const { getPortfolioNews } = require('./services/newsService');
 const { analyzePositionForecast } = require('./services/forecastService');
@@ -23,8 +22,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Inicializar la base de datos
-const db = initDb();
+// Inicializar la base de datos (PostgreSQL Cloud o SQLite Local)
+initDb();
 
 // Configurar multer para subida de archivos Excel
 const upload = multer({ dest: path.join(__dirname, 'uploads/') });
@@ -37,7 +36,6 @@ function authenticateToken(req, res, next) {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    // Si no hay token, usar usuario por defecto ID 1 (Mauricio Martinez)
     req.user = { id: 1, name: 'Mauricio Martinez', email: 'mauricio@cartera.com' };
     return next();
   }
@@ -67,19 +65,16 @@ app.post('/api/auth/register', (req, res) => {
   const cleanEmail = email.trim().toLowerCase();
   const passwordHash = bcrypt.hashSync(password, 10);
 
-  const stmt = db.prepare(`
-    INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)
-  `);
-
-  stmt.run([name.trim(), cleanEmail, passwordHash], function(err) {
+  const sql = 'INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)';
+  db.run(sql, [name.trim(), cleanEmail, passwordHash], function(err) {
     if (err) {
-      if (err.message.includes('UNIQUE')) {
+      if (String(err.message).includes('UNIQUE') || String(err.message).includes('unique')) {
         return res.status(400).json({ error: 'El correo electrónico ya está registrado. Intenta iniciar sesión.' });
       }
       return res.status(500).json({ error: err.message });
     }
 
-    const userId = this.lastID;
+    const userId = this.lastID || 1;
     const userPayload = { id: userId, name: name.trim(), email: cleanEmail };
     const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: '30d' });
 
@@ -139,19 +134,9 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: err.message });
     }
 
-    // Función estricta para identificar la transacción de APPS
-    const isApps = (r) => {
-      const s = String(r.symbol || '').toUpperCase().trim();
-      const n = String(r.original_name || '').toUpperCase().trim();
-      return s.includes('APPS') || n.includes('APPS') || r.id === 32 || r.id === 31 || (r.sell_price && r.sell_price > 0);
-    };
-
-    // Asegurar que la transacción de APPS tenga los datos exactos de venta ($13.51 por acción, ganancia +$25.35 / +48.79%)
-    db.run("UPDATE transactions SET status = 'closed', sell_date = '2026-08-05', sell_quantity = 5.72246696, sell_price = 13.51, sell_total = 77.31, realized_gain = 25.35, days_held = 2, return_percent = 48.79 WHERE (symbol = 'APPS' OR id = 32)");
-
-    // Filtrado estricto de las 8 posiciones abiertas (excluyendo transacciones cerradas como APPS)
-    const openRows = rows.filter(r => r.status === 'open' && !isApps(r));
-    const closedRows = rows.filter(r => r.status === 'closed' || isApps(r));
+    rows = rows || [];
+    const openRows = rows.filter(r => r.status === 'open');
+    const closedRows = rows.filter(r => r.status === 'closed');
 
     const openSymbols = openRows.map(r => r.symbol);
     const livePrices = await getStockPrices(openSymbols);
@@ -161,14 +146,17 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
     let totalDailyChangeDollar = 0;
 
     const openPositions = openRows.map(row => {
-      const live = livePrices[row.symbol] || { price: row.buy_price, change: 0, changePercent: 0, prevClose: row.buy_price };
-      const currentPrice = live.price;
-      const currentValue = row.quantity * currentPrice;
-      const unrealizedGain = currentValue - row.buy_total;
-      const unrealizedGainPercent = row.buy_total > 0 ? (unrealizedGain / row.buy_total) * 100 : 0;
-      const dailyChange = row.quantity * (currentPrice - live.prevClose);
+      const live = livePrices[row.symbol] || { price: parseFloat(row.buy_price), change: 0, changePercent: 0, prevClose: parseFloat(row.buy_price) };
+      const currentPrice = parseFloat(live.price);
+      const buyTotal = parseFloat(row.buy_total);
+      const quantity = parseFloat(row.quantity);
 
-      totalOpenInvested += row.buy_total;
+      const currentValue = quantity * currentPrice;
+      const unrealizedGain = currentValue - buyTotal;
+      const unrealizedGainPercent = buyTotal > 0 ? (unrealizedGain / buyTotal) * 100 : 0;
+      const dailyChange = quantity * (currentPrice - parseFloat(live.prevClose || currentPrice));
+
+      totalOpenInvested += buyTotal;
       currentPortfolioValue += currentValue;
       totalDailyChangeDollar += dailyChange;
 
@@ -177,24 +165,27 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
         const bDate = new Date(row.buy_date);
         const today = new Date();
         const diffTime = Math.abs(today - bDate);
-        daysHeld = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        daysHeld = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
       }
 
       const forecast = analyzePositionForecast({
         symbol: row.symbol,
-        buy_price: row.buy_price,
+        buy_price: parseFloat(row.buy_price),
         livePrice: currentPrice,
         unrealizedGainPercent: unrealizedGainPercent,
         daysHeld: daysHeld,
-        stop_loss: row.stop_loss
+        stop_loss: row.stop_loss ? parseFloat(row.stop_loss) : null
       });
 
       return {
         ...row,
+        quantity: parseFloat(row.quantity),
+        buy_price: parseFloat(row.buy_price),
+        buy_total: parseFloat(row.buy_total),
         livePrice: currentPrice,
-        prevClose: live.prevClose,
-        change: live.change,
-        changePercent: live.changePercent,
+        prevClose: parseFloat(live.prevClose || currentPrice),
+        change: parseFloat(live.change || 0),
+        changePercent: parseFloat(live.changePercent || 0),
         currentValue: Number(currentValue.toFixed(2)),
         unrealizedGain: Number(unrealizedGain.toFixed(2)),
         unrealizedGainPercent: Number(unrealizedGainPercent.toFixed(2)),
@@ -212,11 +203,26 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
     let totalRealizedGain = 0;
     let winningTrades = 0;
 
-    closedRows.forEach(row => {
-      totalClosedInvested += (row.buy_total || 0);
-      totalClosedReturned += (row.sell_total || 0);
-      totalRealizedGain += (row.realized_gain || 0);
-      if ((row.realized_gain || 0) > 0) winningTrades++;
+    const formattedClosedRows = closedRows.map(row => {
+      const buyTotal = parseFloat(row.buy_total || 0);
+      const sellTotal = parseFloat(row.sell_total || (parseFloat(row.quantity) * parseFloat(row.sell_price || row.buy_price)));
+      const gain = row.realized_gain !== undefined && row.realized_gain !== null ? parseFloat(row.realized_gain) : (sellTotal - buyTotal);
+
+      totalClosedInvested += buyTotal;
+      totalClosedReturned += sellTotal;
+      totalRealizedGain += gain;
+      if (gain > 0) winningTrades++;
+
+      return {
+        ...row,
+        quantity: parseFloat(row.quantity),
+        buy_price: parseFloat(row.buy_price),
+        buy_total: buyTotal,
+        sell_price: parseFloat(row.sell_price || 0),
+        sell_total: sellTotal,
+        realized_gain: gain,
+        return_percent: parseFloat(row.return_percent || (buyTotal > 0 ? (gain / buyTotal) * 100 : 0))
+      };
     });
 
     const realizedGainPercentTotal = totalClosedInvested > 0 ? (totalRealizedGain / totalClosedInvested) * 100 : 0;
@@ -253,7 +259,7 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
         updatedAt: new Date().toISOString()
       },
       openPositions,
-      closedPositions: closedRows,
+      closedPositions: formattedClosedRows,
       allocation,
       news
     });
@@ -297,15 +303,15 @@ app.post('/api/transactions/buy', authenticateToken, (req, res) => {
   const numStopLoss = stop_loss ? parseFloat(stop_loss) : null;
   const bDate = buy_date || new Date().toISOString().split('T')[0];
 
-  const stmt = db.prepare(`
+  const sql = `
     INSERT INTO transactions (
       user_id, symbol, original_name, type, buy_date, quantity, buy_price, buy_total, stop_loss, status, notes
     ) VALUES (?, ?, ?, 'BUY', ?, ?, ?, ?, ?, 'open', ?)
-  `);
+  `;
 
-  stmt.run([userId, cleanSymbol, original_name || cleanSymbol, bDate, numQty, numPrice, buyTotal, numStopLoss, notes || ''], function(err) {
+  db.run(sql, [userId, cleanSymbol, original_name || cleanSymbol, bDate, numQty, numPrice, buyTotal, numStopLoss, notes || ''], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: 'Compra registrada con éxito', id: this.lastID });
+    res.json({ message: 'Compra registrada con éxito', id: this ? this.lastID : 1 });
   });
 });
 
@@ -326,10 +332,11 @@ app.post('/api/transactions/sell', authenticateToken, (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ error: 'Posición no encontrada' });
 
-    const sQty = row.quantity;
+    const sQty = parseFloat(row.quantity);
+    const buyTotal = parseFloat(row.buy_total);
     const sellTotal = sQty * sPrice;
-    const realizedGain = sellTotal - row.buy_total;
-    const returnPercent = row.buy_total > 0 ? (realizedGain / row.buy_total) * 100 : 0;
+    const realizedGain = sellTotal - buyTotal;
+    const returnPercent = buyTotal > 0 ? (realizedGain / buyTotal) * 100 : 0;
 
     const bDate = new Date(row.buy_date || Date.now());
     const sDateObj = new Date(sDate);
@@ -366,6 +373,7 @@ app.post('/api/transactions/edit', authenticateToken, (req, res) => {
     return res.status(400).json({ error: 'ID, precio y cantidad son requeridos' });
   }
 
+  const targetId = parseInt(id);
   const numQty = parseFloat(quantity);
   const numPrice = parseFloat(buy_price);
   const buyTotal = numQty * numPrice;
@@ -382,18 +390,19 @@ app.post('/api/transactions/edit', authenticateToken, (req, res) => {
     WHERE id = ? AND user_id = ?
   `;
 
-  db.run(sql, [buy_date, numQty, numPrice, buyTotal, numStopLoss, notes || '', id, userId], function(err) {
+  db.run(sql, [buy_date, numQty, numPrice, buyTotal, numStopLoss, notes || '', targetId, userId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: 'Transacción actualizada con éxito', id });
+    res.json({ message: 'Transacción actualizada con éxito', id: targetId });
   });
 });
 
 // 6. Eliminar una transacción
 app.delete('/api/transactions/:id', authenticateToken, (req, res) => {
   const userId = req.user.id;
-  db.run('DELETE FROM transactions WHERE id = ? AND user_id = ?', [req.params.id, userId], function(err) {
+  const targetId = parseInt(req.params.id);
+  db.run('DELETE FROM transactions WHERE id = ? AND user_id = ?', [targetId, userId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: 'Registro eliminado', changes: this.changes });
+    res.json({ message: 'Registro eliminado', id: targetId });
   });
 });
 
@@ -404,32 +413,29 @@ app.get('/api/prices', async (req, res) => {
   res.json(prices);
 });
 
-// 6b. Endpoint de gráfico intradiario (cada 30 min)
+// 8. Endpoint de gráfico intradiario (cada 30 min)
 app.get('/api/chart/intraday', async (req, res) => {
   const symbol = req.query.symbol || 'TSLA';
   const data = await getIntradayChartData(symbol);
   res.json(data);
 });
 
-// 6c. Endpoint de gráfico histórico de la cartera (Valor Total vs Tiempo)
+// 9. Endpoint de gráfico histórico de la cartera (Valor Total vs Tiempo)
 app.get('/api/chart/historical-portfolio', authenticateToken, (req, res) => {
   const userId = req.user.id;
 
   db.all('SELECT * FROM transactions WHERE user_id = ? ORDER BY buy_date ASC, id ASC', [userId], async (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
 
-    if (!rows || rows.length === 0) {
+    rows = rows || [];
+    if (rows.length === 0) {
       return res.json({ timeline: [] });
     }
 
     const openSymbols = [...new Set(rows.filter(r => r.status === 'open').map(r => r.symbol))];
     const livePrices = await getStockPrices(openSymbols);
 
-    // Agrupar operaciones por fecha
     const dateMap = {};
-    let cumInvested = 0;
-    let cumRealizedGain = 0;
-
     rows.forEach(r => {
       const dStr = r.buy_date || new Date().toISOString().split('T')[0];
       if (!dateMap[dStr]) {
@@ -441,28 +447,30 @@ app.get('/api/chart/historical-portfolio', authenticateToken, (req, res) => {
     const datesSorted = Object.keys(dateMap).sort();
     const timeline = [];
 
-    // Calcular valuaciones evolutivas
     let currentInvested = 0;
     let currentRealized = 0;
-    const activeHoldings = {}; // symbol -> { qty, buyTotal }
+    const activeHoldings = {};
 
     datesSorted.forEach(dStr => {
       const dayData = dateMap[dStr];
 
       dayData.items.forEach(item => {
+        const qty = parseFloat(item.quantity);
+        const buyTotal = parseFloat(item.buy_total);
+        const gain = parseFloat(item.realized_gain || 0);
+
         if (item.status === 'open') {
-          currentInvested += (item.buy_total || 0);
+          currentInvested += buyTotal;
           if (!activeHoldings[item.symbol]) {
             activeHoldings[item.symbol] = { qty: 0, total: 0 };
           }
-          activeHoldings[item.symbol].qty += item.quantity;
-          activeHoldings[item.symbol].total += item.buy_total;
+          activeHoldings[item.symbol].qty += qty;
+          activeHoldings[item.symbol].total += buyTotal;
         } else if (item.status === 'closed') {
-          currentRealized += (item.realized_gain || 0);
+          currentRealized += gain;
         }
       });
 
-      // Calcular valor de las posiciones abiertas a la fecha o precio actual
       let valAtDate = 0;
       Object.keys(activeHoldings).forEach(sym => {
         const holding = activeHoldings[sym];
@@ -480,7 +488,6 @@ app.get('/api/chart/historical-portfolio', authenticateToken, (req, res) => {
       });
     });
 
-    // Agregar hito final (Hoy) si la última fecha no es hoy
     const todayStr = new Date().toISOString().split('T')[0];
     if (timeline.length > 0 && timeline[timeline.length - 1].date !== todayStr) {
       let finalVal = 0;
@@ -504,7 +511,7 @@ app.get('/api/chart/historical-portfolio', authenticateToken, (req, res) => {
   });
 });
 
-// 9. Importar archivo Excel o CSV para el usuario autenticado
+// 10. Importar archivo Excel o CSV para el usuario autenticado
 app.post('/api/import-excel', authenticateToken, upload.single('file'), (req, res) => {
   const userId = req.user.id;
   if (!req.file) {
@@ -529,13 +536,6 @@ app.post('/api/import-excel', authenticateToken, upload.single('file'), (req, re
 
     const dataRows = headerIdx !== -1 ? rows.slice(headerIdx + 1) : rows;
 
-    const stmt = db.prepare(`
-      INSERT INTO transactions (
-        user_id, notes, symbol, original_name, buy_date, quantity, buy_price, buy_total, stop_loss, status,
-        sell_date, sell_quantity, sell_price, sell_total, realized_gain, days_held, return_percent
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
     dataRows.forEach(r => {
       if (!r || r.length < 2) return;
       const notes = r[0] ? String(r[0]).trim() : '';
@@ -559,7 +559,13 @@ app.post('/api/import-excel', authenticateToken, upload.single('file'), (req, re
       const returnPercent = parseFloat(r[14]) || (status === 'closed' && buyTotal > 0 ? (realizedGain / buyTotal) * 100 : 0);
 
       if (symbol && quantity > 0) {
-        stmt.run([
+        const sql = `
+          INSERT INTO transactions (
+            user_id, notes, symbol, original_name, buy_date, quantity, buy_price, buy_total, stop_loss, status,
+            sell_date, sell_quantity, sell_price, sell_total, realized_gain, days_held, return_percent
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        db.run(sql, [
           userId, notes, symbol, rawTicker, buyDate, quantity, buyPrice, buyTotal, stopLoss, status,
           sellDate, sellQuantity, sellPrice, sellTotal, realizedGain, daysHeld, returnPercent
         ]);
@@ -567,8 +573,7 @@ app.post('/api/import-excel', authenticateToken, upload.single('file'), (req, re
       }
     });
 
-    stmt.finalize();
-    fs.unlinkSync(filePath);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     res.json({ message: `Se importaron ${count} operaciones correctamente desde el Excel.`, count });
   } catch (err) {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -576,12 +581,13 @@ app.post('/api/import-excel', authenticateToken, upload.single('file'), (req, re
   }
 });
 
-// 10. Exportar base de datos del usuario a Excel
+// 11. Exportar base de datos del usuario a Excel
 app.get('/api/export-excel', authenticateToken, (req, res) => {
   const userId = req.user.id;
   db.all('SELECT * FROM transactions WHERE user_id = ? ORDER BY buy_date DESC', [userId], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
 
+    rows = rows || [];
     const exportData = rows.map(r => ({
       'ID': r.id,
       'Ticker (Símbolo)': r.symbol,
@@ -589,8 +595,8 @@ app.get('/api/export-excel', authenticateToken, (req, res) => {
       'Tipo': r.type,
       'Fecha Compra': r.buy_date,
       'Cantidad Acciones': r.quantity,
-      'Precio Compra US$': r.buy_price,
-      'Inversión Total US$': r.buy_total,
+      'Precio Compra US$': parseFloat(r.buy_price),
+      'Inversión Total US$': parseFloat(r.buy_total),
       'Stop Loss US$': r.stop_loss || '',
       'Estado': r.status === 'open' ? 'Abierta' : 'Cerrada',
       'Fecha Venta': r.sell_date || '',
@@ -599,7 +605,7 @@ app.get('/api/export-excel', authenticateToken, (req, res) => {
       'Total Venta US$': r.sell_total || '',
       'Ganancia Realizada US$': r.realized_gain || '',
       'Días en Cartera': r.days_held || '',
-      'Rentabilidad %': r.return_percent ? `${r.return_percent.toFixed(2)}%` : '',
+      'Rentabilidad %': r.return_percent ? `${parseFloat(r.return_percent).toFixed(2)}%` : '',
       'Notas': r.notes || ''
     }));
 
