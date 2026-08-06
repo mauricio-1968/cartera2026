@@ -21,6 +21,7 @@ const tickerMap = {
   'GOOGLE CA': 'GOOGL',
   'IREN': 'IREN',
   'KOLD': 'KOLD',
+  'KVYO': 'KVYO',
   'LEU': 'LEU',
   'LNAI': 'LNAI',
   'META': 'META',
