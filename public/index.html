@@ -168,13 +168,48 @@
           </div>
 
           <!-- SECCIÓN DE NOTICIAS EN ESPAÑOL DE LAS ÚLTIMAS 24 HORAS -->
-          <div class="card">
+          <div class="card" style="margin-bottom: 24px;">
             <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
               <span>📰 Noticias & Novedades Bursátiles (Tus Posiciones - Últimas 24h)</span>
               <span class="badge-up" style="font-size: 11px; padding: 3px 8px;">🔄 Actualización en Vivo (24 Horas)</span>
             </div>
             <div class="news-feed-container" id="news-feed-container">
               <div style="text-align: center; color: var(--text-muted); padding: 20px;">Cargando noticias recientes de tus acciones (Últimas 24h)...</div>
+            </div>
+          </div>
+
+          <!-- CARD: RADAR DE OPORTUNIDADES & ANÁLISIS TÉCNICO DE CORTO PLAZO -->
+          <div class="card">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <span>🎯 Radar de Oportunidades & Análisis Técnico (Corto Plazo)</span>
+              
+              <!-- Formulario de Agregar Ticker al Radar -->
+              <form onsubmit="app.addToWatchlist(event)" style="display: flex; gap: 8px; align-items: center;">
+                <input type="text" id="watchlist-input-symbol" class="form-input" placeholder="Ticker (ej: PLTR, AMD, DIS)" style="width: 180px; padding: 5px 10px; text-transform: uppercase; font-weight: bold;" required>
+                <button type="submit" class="btn btn-primary" style="padding: 5px 12px; font-size: 12px;">
+                  ➕ Agregar al Radar
+                </button>
+              </form>
+            </div>
+
+            <!-- Tabla del Radar de Oportunidades -->
+            <div style="overflow-x: auto; margin-top: 12px;">
+              <table class="data-table" style="font-size: 12px;">
+                <thead>
+                  <tr>
+                    <th>Empresa / Ticker</th>
+                    <th>Precio Actual</th>
+                    <th>RSI (14d)</th>
+                    <th>Medias Móviles (50d / 200d)</th>
+                    <th>Soporte / Resistencia</th>
+                    <th>Indicador de Decisión</th>
+                    <th style="text-align: center;">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-watchlist">
+                  <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 15px;">Cargando Radar de Análisis Técnico...</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -570,6 +605,59 @@
 
       <div style="display: flex; justify-content: flex-end; gap: 12px;">
         <button type="button" class="btn btn-primary" onclick="app.closeNewsModal()">Entendido / Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DESGLOSE DE ANÁLISIS TÉCNICO DE CORTO PLAZO -->
+  <div class="modal-backdrop" id="modal-technical">
+    <div class="modal-box" style="max-width: 650px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>🎯 Diagnóstico Técnico de Corto Plazo</span>
+          <span class="brand-badge" id="ta-modal-symbol">PLTR</span>
+        </div>
+        <button class="modal-close" onclick="app.closeTechnicalModal()">✕</button>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: rgba(0,0,0,0.3); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-color);">
+        <div>
+          <div id="ta-modal-name" style="font-size: 15px; font-weight: 700; color: #fff;"></div>
+          <div style="font-size: 12px; color: var(--text-muted);">Cotización Actual: <strong id="ta-modal-price" style="color: #60a5fa;"></strong></div>
+        </div>
+        <div id="ta-modal-badge" class="badge-up" style="font-size: 13px; padding: 6px 14px; font-weight: bold;"></div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px;">
+        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">RSI (14d)</div>
+          <div id="ta-modal-rsi" style="font-size: 18px; font-weight: 800; margin-top: 4px;"></div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Media SMA 50</div>
+          <div id="ta-modal-sma50" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: #38bdf8;"></div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Media SMA 200</div>
+          <div id="ta-modal-sma200" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: #a855f7;"></div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Soporte Clave</div>
+          <div id="ta-modal-support" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: #10b981;"></div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Resistencia Clave</div>
+          <div id="ta-modal-resistance" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: #ef4444;"></div>
+        </div>
+      </div>
+
+      <div style="background: rgba(0,0,0,0.3); border-left: 4px solid var(--primary); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Fundamento & Análisis de Decisión Táctica</div>
+        <p id="ta-modal-reason" style="font-size: 14px; color: var(--text-main); line-height: 1.6;"></p>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+        <button type="button" class="btn btn-primary" onclick="app.closeTechnicalModal()">Entendido / Cerrar</button>
       </div>
     </div>
   </div>

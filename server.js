@@ -12,6 +12,7 @@ const { initDb, tickerMap } = require('./database/initDb');
 const { getStockPrices, getIntradayChartData } = require('./services/stockPriceService');
 const { getPortfolioNews } = require('./services/newsService');
 const { analyzePositionForecast } = require('./services/forecastService');
+const { getTechnicalAnalysis } = require('./services/technicalAnalysisService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -418,6 +419,75 @@ app.get('/api/chart/intraday', async (req, res) => {
   const symbol = req.query.symbol || 'TSLA';
   const data = await getIntradayChartData(symbol);
   res.json(data);
+});
+
+// ==========================================
+// ENDPOINTS DE RADAR DE OPORTUNIDADES & ANÁLISIS TÉCNICO (WATCHLIST)
+// ==========================================
+
+// 8b. Obtener la Watchlist del usuario con Análisis Técnico en tiempo real
+app.get('/api/watchlist', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+
+  db.all('SELECT * FROM watchlist WHERE user_id = ? ORDER BY id ASC', [userId], async (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    rows = rows || [];
+    if (rows.length === 0) {
+      return res.json({ watchlist: [] });
+    }
+
+    const symbols = [...new Set(rows.map(r => r.symbol.trim().toUpperCase()))];
+    const taPromises = symbols.map(sym => getTechnicalAnalysis(sym));
+    const taResults = await Promise.all(taPromises);
+
+    const watchlistWithTA = rows.map(r => {
+      const sym = r.symbol.trim().toUpperCase();
+      const ta = taResults.find(t => t.symbol === sym) || {};
+      return {
+        id: r.id,
+        user_id: r.user_id,
+        symbol: sym,
+        created_at: r.created_at,
+        ...ta
+      };
+    });
+
+    res.json({ watchlist: watchlistWithTA });
+  });
+});
+
+// 8c. Agregar un símbolo al Radar del usuario
+app.post('/api/watchlist', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  const { symbol } = req.body;
+
+  if (!symbol) {
+    return res.status(400).json({ error: 'El símbolo del ticker es requerido' });
+  }
+
+  const cleanSymbol = symbol.trim().toUpperCase();
+
+  db.get('SELECT * FROM watchlist WHERE user_id = ? AND UPPER(symbol) = ?', [userId, cleanSymbol], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (row) return res.status(400).json({ error: `La empresa ${cleanSymbol} ya está en tu radar.` });
+
+    db.run('INSERT INTO watchlist (user_id, symbol) VALUES (?, ?)', [userId, cleanSymbol], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ message: `Empresa ${cleanSymbol} agregada al radar de análisis técnico con éxito.`, symbol: cleanSymbol });
+    });
+  });
+});
+
+// 8d. Eliminar un símbolo del Radar del usuario
+app.delete('/api/watchlist/:symbol', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  const cleanSymbol = req.params.symbol.trim().toUpperCase();
+
+  db.run('DELETE FROM watchlist WHERE user_id = ? AND UPPER(symbol) = ?', [userId, cleanSymbol], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: `Empresa ${cleanSymbol} eliminada del radar.`, symbol: cleanSymbol });
+  });
 });
 
 // 9. Endpoint de gráfico histórico de la cartera (Valor Total vs Tiempo)

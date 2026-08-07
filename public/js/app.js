@@ -169,6 +169,7 @@ const app = {
       this.renderNews(data.news);
       this.renderOpenTable(data.openPositions);
       this.renderClosedTable(data.closedPositions);
+      this.fetchWatchlist();
 
     } catch (err) {
       console.error('Error cargando portafolio:', err);
@@ -1094,6 +1095,151 @@ const app = {
     let url = '/api/export-excel';
     if (token) url += `?token=${token}`;
     window.location.href = url;
+  },
+
+  async fetchWatchlist() {
+    try {
+      const res = await fetch('/api/watchlist', {
+        headers: this.getAuthHeaders()
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      this.watchlist = data.watchlist || [];
+      this.renderWatchlistTable(this.watchlist);
+    } catch (err) {
+      console.error('Error cargando watchlist:', err);
+    }
+  },
+
+  renderWatchlistTable(watchlist) {
+    const tbody = document.getElementById('tbody-watchlist');
+    if (!tbody) return;
+
+    if (!watchlist || watchlist.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 15px;">No tienes empresas en tu radar. Agrega un ticker arriba para iniciar el seguimiento.</td></tr>`;
+      return;
+    }
+
+    let html = '';
+    watchlist.forEach(w => {
+      const isUp = (w.changePercent || 0) >= 0;
+      const badgeClass = w.decisionColor === 'success' ? 'badge-up' : (w.decisionColor === 'danger' ? 'badge-down' : 'badge-neutral');
+
+      html += `
+        <tr>
+          <td>
+            <div class="symbol-cell">
+              <div class="symbol-avatar">${w.symbol.substring(0, 3)}</div>
+              <div>
+                <div class="symbol-name">${w.symbol}</div>
+                <div class="symbol-sub">${w.name || w.symbol}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div style="font-weight: 700; color: #fff;">$${(w.currentPrice || 0).toFixed(2)}</div>
+            <div style="font-size: 11px;" class="${isUp ? 'stat-up' : 'stat-down'}">${isUp ? '+' : ''}${(w.changePercent || 0).toFixed(2)}%</div>
+          </td>
+          <td>
+            <span style="font-weight: 800; color: ${w.rsi < 35 ? '#60a5fa' : (w.rsi > 68 ? '#ef4444' : '#10b981')};">
+              RSI ${w.rsi || 50}
+            </span>
+          </td>
+          <td>
+            <div style="font-size: 11px; color: var(--text-muted);">
+              SMA 50: <strong style="color: #38bdf8;">$${w.sma50 || '-'}</strong><br>
+              SMA 200: <strong style="color: #a855f7;">$${w.sma200 || '-'}</strong>
+            </div>
+          </td>
+          <td>
+            <div style="font-size: 11px; color: var(--text-muted);">
+              Soporte: <strong style="color: #10b981;">$${w.support || '-'}</strong><br>
+              Resistencia: <strong style="color: #ef4444;">$${w.resistance || '-'}</strong>
+            </div>
+          </td>
+          <td>
+            <span class="${badgeClass}" style="cursor: pointer; padding: 5px 10px; font-weight: bold; font-size: 11px;" onclick="app.openTechnicalModal('${w.symbol}')">
+              ${w.decisionBadge || '🟡 ESPERAR'}
+            </span>
+          </td>
+          <td style="text-align: center;">
+            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px; color: #ef4444;" title="Quitar del Radar" onclick="app.removeFromWatchlist('${w.symbol}')">
+              🗑️ Quitar
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+
+    tbody.innerHTML = html;
+  },
+
+  async addToWatchlist(e) {
+    if (e) e.preventDefault();
+    const input = document.getElementById('watchlist-input-symbol');
+    if (!input || !input.value.trim()) return;
+
+    const symbol = input.value.trim().toUpperCase();
+    try {
+      const res = await fetch('/api/watchlist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeaders()
+        },
+        body: JSON.stringify({ symbol })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al agregar empresa');
+
+      input.value = '';
+      await this.fetchWatchlist();
+    } catch (err) {
+      alert('Error agregando ticker: ' + err.message);
+    }
+  },
+
+  async removeFromWatchlist(symbol) {
+    if (!confirm(`¿Deseas quitar a ${symbol} de tu radar de análisis técnico?`)) return;
+
+    try {
+      const res = await fetch(`/api/watchlist/${encodeURIComponent(symbol)}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders()
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al eliminar');
+
+      await this.fetchWatchlist();
+    } catch (err) {
+      alert('Error eliminando ticker: ' + err.message);
+    }
+  },
+
+  openTechnicalModal(symbol) {
+    const item = (this.watchlist || []).find(w => w.symbol === symbol);
+    if (!item) return;
+
+    document.getElementById('ta-modal-symbol').innerText = item.symbol;
+    document.getElementById('ta-modal-name').innerText = item.name || item.symbol;
+    document.getElementById('ta-modal-price').innerText = `$${(item.currentPrice || 0).toFixed(2)}`;
+    
+    const badge = document.getElementById('ta-modal-badge');
+    badge.innerText = item.decisionBadge || '🟡 ESPERAR';
+    badge.className = item.decisionColor === 'success' ? 'badge-up' : (item.decisionColor === 'danger' ? 'badge-down' : 'badge-neutral');
+
+    document.getElementById('ta-modal-rsi').innerText = item.rsi || 50;
+    document.getElementById('ta-modal-sma50').innerText = `$${item.sma50 || '-'}`;
+    document.getElementById('ta-modal-sma200').innerText = `$${item.sma200 || '-'}`;
+    document.getElementById('ta-modal-support').innerText = `$${item.support || '-'}`;
+    document.getElementById('ta-modal-resistance').innerText = `$${item.resistance || '-'}`;
+    document.getElementById('ta-modal-reason').innerText = item.reason || 'Sin detalles';
+
+    document.getElementById('modal-technical').classList.add('active');
+  },
+
+  closeTechnicalModal() {
+    document.getElementById('modal-technical').classList.remove('active');
   }
 };
 

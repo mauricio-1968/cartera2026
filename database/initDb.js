@@ -89,6 +89,16 @@ function initDb() {
       )
     `);
 
+    // 4. Tabla de Watchlist (Radar de Oportunidades & Análisis Técnico)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS watchlist (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER DEFAULT 1,
+        symbol VARCHAR(50) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Crear cuenta principal para Mauricio Martinez por defecto si no existe
     db.get('SELECT COUNT(*) as count FROM users', [], (err, row) => {
       if (err) return;
@@ -102,6 +112,19 @@ function initDb() {
             if (!err) console.log('Usuario principal creado: Mauricio Martinez (mauricio@cartera.com)');
           }
         );
+      }
+    });
+
+    // Inicializar tickers de radar por defecto para el usuario 1 si está vacío
+    db.get('SELECT COUNT(*) as count FROM watchlist WHERE user_id = 1', [], (err, row) => {
+      if (err) return;
+      const count = row ? (row.count || row.COUNT || 0) : 0;
+      if (parseInt(count) === 0) {
+        const defaultWatchlist = ['PLTR', 'AMD', 'MARA', 'SMCI'];
+        defaultWatchlist.forEach(sym => {
+          db.run('INSERT INTO watchlist (user_id, symbol) VALUES (1, ?)', [sym]);
+        });
+        console.log('Watchlist por defecto inicializada para Mauricio Martinez: PLTR, AMD, MARA, SMCI');
       }
     });
   });
