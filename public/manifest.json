@@ -1,0 +1,21 @@
+{
+  "name": "Portrack",
+  "short_name": "Portrack",
+  "description": "Portrack - Sistema de Administración de Cartera de Acciones EE.UU. e Inteligencia de Trading",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "/css/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/css/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

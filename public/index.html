@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Portrack | Cartera de Acciones EE.UU. & Trading Multi-Usuario</title>
+  
+  <!-- Manifest PWA para Tablet Android e iOS -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#10b981">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Font & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="/css/styles.css">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="header-top">
+      <div class="brand">
+        <div class="brand-icon">📈</div>
+        <div>
+          <div class="brand-title">Portrack <span class="brand-badge">Bolsa EE.UU.</span></div>
+          <div class="brand-author">Desarrollado por <strong>Mauricio Martinez</strong></div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <!-- ÁREA DE USUARIO Y LOGIN -->
+        <div id="user-profile-bar" style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 13px; font-weight: 600; color: #60a5fa;">👤 <span id="current-user-name">Mauricio Martinez</span></span>
+          <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="app.logout()">
+            🚪 Cerrar Sesión
+          </button>
+        </div>
+
+        <!-- Botón de Alternar Modo Claro / Oscuro -->
+        <button class="btn btn-secondary" id="btn-theme-toggle" onclick="app.toggleTheme()">
+          <span id="theme-icon">☀️</span> <span id="theme-text">Modo Claro</span>
+        </button>
+
+        <button class="btn btn-secondary" onclick="app.refreshData()">
+          <span id="refresh-spinner">🔄</span> Actualizar Precios
+        </button>
+        <button class="btn btn-primary" onclick="app.openBuyModal()">
+          ➕ Nueva Compra
+        </button>
+        <button class="btn btn-success" onclick="app.openSellModalFromHeader()">
+          💵 Vender Acción
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="main-container">
+
+    <!-- NAV TABS -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" onclick="app.switchTab('dashboard', event)">📊 Tablero Principal</button>
+      <button class="tab-btn" onclick="app.switchTab('open', event)">🟢 Posiciones Abiertas (<span id="count-open">0</span>)</button>
+      <button class="tab-btn" onclick="app.switchTab('closed', event)">🔴 Histórico de Ventas (<span id="count-closed">0</span>)</button>
+      <button class="tab-btn" onclick="app.switchTab('import', event)">📂 Importar Excel / Respaldos</button>
+    </nav>
+
+    <!-- TAB 1: DASHBOARD -->
+    <section id="tab-dashboard">
+      <!-- Stat Cards -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-title">Valor Total Cartera</span>
+            <span class="stat-icon">💰</span>
+          </div>
+          <div class="stat-value" id="stat-total-val">$0.00</div>
+          <div class="stat-sub" id="stat-total-sub">
+            Cargando...
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-title">Ganancia Flotante (No Realizada)</span>
+            <span class="stat-icon">📈</span>
+          </div>
+          <div class="stat-value" id="stat-unrealized">$0.00</div>
+          <div class="stat-sub" id="stat-unrealized-sub">
+            Posiciones Abiertas
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-title">Ganancia Realizada (Ventas)</span>
+            <span class="stat-icon">💵</span>
+          </div>
+          <div class="stat-value text-success" id="stat-realized">$0.00</div>
+          <div class="stat-sub text-success" id="stat-realized-sub">
+            +0.0% Retorno Cerrado
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-title">Efectividad (Win Rate)</span>
+            <span class="stat-icon">🏆</span>
+          </div>
+          <div class="stat-value" id="stat-winrate">0.0%</div>
+          <div class="stat-sub" id="stat-winrate-sub">
+            0 ventas registradas
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard Layout con Ticker Vertical -->
+      <div class="dashboard-layout">
+        <!-- Columna Izquierda: Gráfico Lineal/Velas Intradiario, Gráfico Histórico y Noticias -->
+        <div class="dashboard-left">
+          <!-- CARD 1: GRÁFICO INTRADIARIO (LÍNEA VS VELAS JAPONESAS VS VOLUMEN) -->
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <span>📈 Evolución Intradiaria del Precio y Volumen (Cada 30 min - Hoy)</span>
+              <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <!-- Selector de Estilo de Gráfico -->
+                <div style="display: flex; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 2px; border: 1px solid var(--border-color);">
+                  <button type="button" id="btn-chart-style-line" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="app.setChartStyle('line')">
+                    📈 Línea
+                  </button>
+                  <button type="button" id="btn-chart-style-candle" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="app.setChartStyle('candle')">
+                    🕯️ Velas Japonesas
+                  </button>
+                  <button type="button" id="btn-chart-volume" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px; margin-left: 4px;" onclick="app.toggleVolume()">
+                    📊 Volumen (<span id="volume-status-text">ON</span>)
+                  </button>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <label style="font-size: 12px; color: var(--text-muted);">Acción:</label>
+                  <select id="chart-stock-select" class="form-input" style="padding: 4px 10px; font-size: 13px; width: auto; font-weight: bold;" onchange="app.changeIntradaySymbol(this.value)">
+                    <!-- Opciones dinámicas -->
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="chart-intraday-line"></canvas>
+            </div>
+          </div>
+
+          <!-- CARD 2: NUEVO GRÁFICO DE EVOLUCIÓN HISTÓRICA (VALOR TOTAL VS TIEMPO) -->
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>📈 Evolución Histórica de la Cartera (Valor Total vs Tiempo)</span>
+              <span style="font-size: 11px; font-weight: normal; color: #10b981;">Ganancia / Pérdida Acumulada Real</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="chart-historical-line"></canvas>
+            </div>
+          </div>
+
+          <!-- CARD: RADAR DE OPORTUNIDADES & ANÁLISIS TÉCNICO DE CORTO PLAZO -->
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <span>🎯 Radar de Oportunidades & Análisis Técnico (Corto Plazo)</span>
+              
+              <!-- Formulario de Agregar Ticker al Radar -->
+              <form onsubmit="app.addToWatchlist(event)" style="display: flex; gap: 8px; align-items: center;">
+                <input type="text" id="watchlist-input-symbol" class="form-input" placeholder="Ticker (ej: PLTR, AMD, DIS)" style="width: 180px; padding: 5px 10px; text-transform: uppercase; font-weight: bold;" required>
+                <button type="submit" class="btn btn-primary" style="padding: 5px 12px; font-size: 12px;">
+                  ➕ Agregar al Radar
+                </button>
+              </form>
+            </div>
+
+            <!-- Tabla del Radar de Oportunidades -->
+            <div style="overflow-x: auto; margin-top: 12px;">
+              <table class="data-table" style="font-size: 12px;">
+                <thead>
+                  <tr>
+                    <th>Empresa / Ticker</th>
+                    <th>Precio Actual</th>
+                    <th>RSI (14d)</th>
+                    <th>Medias Móviles (50d / 200d)</th>
+                    <th>Soporte / Resistencia</th>
+                    <th>Indicador de Decisión</th>
+                    <th style="text-align: center;">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-watchlist">
+                  <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 15px;">Cargando Radar de Análisis Técnico...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- SECCIÓN DE NOTICIAS EN ESPAÑOL DE LAS ÚLTIMAS 24 HORAS -->
+          <div class="card">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+              <span>📰 Noticias & Novedades Bursátiles (Tus Posiciones - Últimas 24h)</span>
+              <span class="badge-up" style="font-size: 11px; padding: 3px 8px;">🔄 Actualización en Vivo (24 Horas)</span>
+            </div>
+            <div class="news-feed-container" id="news-feed-container">
+              <div style="text-align: center; color: var(--text-muted); padding: 20px;">Cargando noticias recientes de tus acciones (Últimas 24h)...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna Derecha: BARRA DE ACCIONES VERTICAL -->
+        <div class="dashboard-right">
+          <div class="card">
+            <div class="card-title">
+              <span>📱 Cotizaciones en Vivo (Lista Vertical)</span>
+              <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);">Bolsa EE.UU.</span>
+            </div>
+            <div class="vertical-ticker-list" id="vertical-ticker-list">
+              <div class="ticker-loading">Cargando cotizaciones...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: POSICIONES ABIERTAS -->
+    <section id="tab-open" style="display: none;">
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>🟢 Posiciones Activas en Cartera (Cotizaciones en Tiempo Real)</span>
+          <button class="btn btn-success" onclick="app.openSellModalFromHeader()" style="padding: 6px 14px; font-size: 13px;">
+            💵 Vender una Acción
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ticker / Acción</th>
+                <th>Fecha Compra</th>
+                <th>Cantidad</th>
+                <th>Precio Compra US$</th>
+                <th>Invertido Total US$</th>
+                <th>Precio Actual US$</th>
+                <th>Valor Presente US$</th>
+                <th>Ganancia / Pérdida US$</th>
+                <th>Retorno %</th>
+                <th>Días</th>
+                <th>🤖 Pronóstico & Horizonte</th>
+                <th style="text-align: center; background: rgba(16, 185, 129, 0.2); color: #10b981;">Operación</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-open">
+              <!-- Renderizado dinámico -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: POSICIONES CERRADAS -->
+    <section id="tab-closed" style="display: none;">
+      <div class="card">
+        <div class="card-title">
+          <span>🔴 Historial de Compras y Ventas Realizadas</span>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Fecha Compra</th>
+                <th>Fecha Venta</th>
+                <th>Cantidad</th>
+                <th>P. Compra US$</th>
+                <th>P. Venta US$</th>
+                <th>Total Invertido</th>
+                <th>Total Recuperado</th>
+                <th>Ganancia Realizada</th>
+                <th>Retorno %</th>
+                <th>Días</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-closed">
+              <!-- Renderizado dinámico -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: IMPORTADOR DE EXCEL -->
+    <section id="tab-import" style="display: none;">
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-title">
+          <span>📂 Carga de Archivos Excel (`.xlsx`, `.xls`, `.csv`)</span>
+        </div>
+        <div class="dropzone" id="excel-dropzone" onclick="document.getElementById('excel-file-input').click()">
+          <div class="dropzone-icon">📥</div>
+          <h3>Arrastra tu archivo Excel aquí o haz clic para seleccionar</h3>
+          <p style="color: var(--text-muted); margin-top: 8px; font-size: 13px;">
+            Soporta archivos Excel como <strong>Portafolio 2026.xlsx</strong>. El sistema procesará automáticamente tus operaciones.
+          </p>
+          <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" style="display: none;" onchange="app.handleFileSelect(event)">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>💾 Descarga de Respaldo Completo</span>
+        </div>
+        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 16px;">
+          Descarga en cualquier momento una copia actualizada de toda tu base de datos histórica en formato Excel (.xlsx).
+        </p>
+        <button class="btn btn-secondary" onclick="app.exportExcel()">
+          📊 Descargar Cartera Completa en Excel
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: AUTENTICACIÓN / LOGIN Y REGISTRO -->
+  <div class="modal-backdrop" id="modal-auth">
+    <div class="modal-box" style="max-width: 440px;">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <div class="brand-icon" style="margin: 0 auto 12px; width: 48px; height: 48px; font-size: 24px;">📈</div>
+        <h2 style="font-size: 20px; font-weight: 700;">Bienvenido a Portrack</h2>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Inicia sesión o crea tu cuenta de inversiones privada</p>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+        <button class="tab-btn active" id="auth-tab-login" onclick="app.switchAuthTab('login')" style="flex: 1; text-align: center;">Iniciar Sesión</button>
+        <button class="tab-btn" id="auth-tab-register" onclick="app.switchAuthTab('register')" style="flex: 1; text-align: center;">Crear Cuenta</button>
+      </div>
+
+      <!-- Formulario Login -->
+      <form id="form-login" onsubmit="app.submitLogin(event)">
+        <div class="form-group">
+          <label class="form-label">Correo Electrónico</label>
+          <input type="email" id="login-email" class="form-input" placeholder="ej. mauricio@cartera.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contraseña</label>
+          <input type="password" id="login-password" class="form-input" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 12px; justify-content: center;">
+          🔐 Iniciar Sesión
+        </button>
+      </form>
+
+      <!-- Formulario Registro -->
+      <form id="form-register" onsubmit="app.submitRegister(event)" style="display: none;">
+        <div class="form-group">
+          <label class="form-label">Nombre Completo</label>
+          <input type="text" id="reg-name" class="form-input" placeholder="ej. Mauricio Martinez" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Correo Electrónico</label>
+          <input type="email" id="reg-email" class="form-input" placeholder="ej. mauricio@ejemplo.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contraseña</label>
+          <input type="password" id="reg-password" class="form-input" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 12px; justify-content: center;">
+          ✨ Crear Mi Cuenta Privada
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: NUEVA COMPRA -->
+  <div class="modal-backdrop" id="modal-buy">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">➕ Registrar Nueva Compra de Acción</div>
+        <button class="modal-close" onclick="app.closeBuyModal()">✕</button>
+      </div>
+      <form onsubmit="app.saveBuy(event)">
+        <div class="form-group">
+          <label class="form-label">Ticker / Símbolo Acción (EE.UU.)</label>
+          <input type="text" id="buy-symbol" class="form-input" placeholder="ej. NVDA, AAPL, TSLA" required style="text-transform: uppercase;">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Fecha de Compra</label>
+            <input type="date" id="buy-date" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Monto Invertido US$</label>
+            <input type="number" step="any" id="buy-total" class="form-input" placeholder="ej. 100.00" required oninput="app.calcBuyQty()">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Precio por Acción US$</label>
+            <input type="number" step="any" id="buy-price" class="form-input" placeholder="ej. 111.55" required oninput="app.calcBuyQty()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cantidad de Acciones (Calculado)</label>
+            <input type="number" step="any" id="buy-qty" class="form-input" placeholder="Autocalculado" readonly style="background: rgba(255,255,255,0.05); font-weight: bold; color: #10b981;">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Stop Loss US$ (Opcional)</label>
+            <input type="number" step="any" id="buy-stop" class="form-input" placeholder="ej. 110.00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notas / Observaciones (Opcional)</label>
+            <input type="text" id="buy-notes" class="form-input" placeholder="ej. Estrategia a los US$ 150">
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeBuyModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Compra</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: REGISTRAR VENTA -->
+  <div class="modal-backdrop" id="modal-sell">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">💵 Registrar Venta de Acción</div>
+        <button class="modal-close" onclick="app.closeSellModal()">✕</button>
+      </div>
+      <form onsubmit="app.saveSell(event)">
+        <input type="hidden" id="sell-id">
+        
+        <div class="form-group" id="group-select-position" style="display: none;">
+          <label class="form-label">Selecciona la Acción a Vender</label>
+          <select id="sell-select-id" class="form-input" onchange="app.handlePositionSelectChange(this)">
+            <!-- Opciones dinámicas -->
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Acción a Vender</label>
+          <input type="text" id="sell-symbol" class="form-input" readonly style="background: rgba(255,255,255,0.05); font-weight: bold; color: #10b981;">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Fecha de Venta</label>
+            <input type="date" id="sell-date" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Precio por Acción Venta US$</label>
+            <input type="number" step="any" id="sell-price" class="form-input" placeholder="ej. 135.00" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Notas de Cierre</label>
+          <input type="text" id="sell-notes" class="form-input" placeholder="ej. Venta con ganancia alcanzada">
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeSellModal()">Cancelar</button>
+          <button type="submit" class="btn btn-success">Confirmar Venta</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EDITAR POSICIÓN -->
+  <div class="modal-backdrop" id="modal-edit">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">✏️ Editar Posición de Acción</div>
+        <button class="modal-close" onclick="app.closeEditModal()">✕</button>
+      </div>
+      <form onsubmit="app.saveEdit(event)">
+        <input type="hidden" id="edit-id">
+        <div class="form-group">
+          <label class="form-label">Ticker / Símbolo Acción</label>
+          <input type="text" id="edit-symbol" class="form-input" readonly style="background: rgba(255,255,255,0.05); font-weight: bold; color: #3b82f6;">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Fecha de Compra</label>
+            <input type="date" id="edit-date" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Monto Invertido US$</label>
+            <input type="number" step="any" id="edit-total" class="form-input" placeholder="ej. 100.00" required oninput="app.calcEditQty()">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Precio por Acción US$</label>
+            <input type="number" step="any" id="edit-price" class="form-input" placeholder="ej. 111.55" required oninput="app.calcEditQty()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cantidad de Acciones (Calculado)</label>
+            <input type="number" step="any" id="edit-qty" class="form-input" placeholder="Autocalculado" readonly style="background: rgba(255,255,255,0.05); font-weight: bold; color: #10b981;">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Stop Loss US$ (Opcional)</label>
+            <input type="number" step="any" id="edit-stop" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notas / Observaciones</label>
+            <input type="text" id="edit-notes" class="form-input">
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeEditModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: PRONÓSTICO & RECOMENDACIÓN ALGORÍTMICA -->
+  <div class="modal-backdrop" id="modal-forecast">
+    <div class="modal-box" style="max-width: 620px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>🤖 Pronóstico & Recomendación Algorítmica</span>
+          <span class="brand-badge" id="fc-modal-symbol">TSLA</span>
+        </div>
+        <button class="modal-close" onclick="app.closeForecastModal()">✕</button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+        <div style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Recomendación Táctica</div>
+          <div id="fc-modal-action" style="font-size: 20px; font-weight: 800; margin-top: 4px;">MANTENER</div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Horizonte Estimado</div>
+          <div id="fc-modal-horizon" style="font-size: 18px; font-weight: 800; color: #60a5fa; margin-top: 4px;">2 a 3 Semanas</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+        <div style="background: rgba(16,185,129,0.08); padding: 14px; border-radius: 10px; border: 1px solid rgba(16,185,129,0.3);">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Precio Objetivo Estimado</div>
+          <div id="fc-modal-target-price" style="font-size: 18px; font-weight: 800; color: #10b981;">$345.00</div>
+          <div id="fc-modal-target-return" style="font-size: 12px; color: #10b981; font-weight: 600;">+12.0% Retorno Esperado</div>
+        </div>
+
+        <div style="background: rgba(59,130,246,0.08); padding: 14px; border-radius: 10px; border: 1px solid rgba(59,130,246,0.3);">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Precio Actual vs Compra</div>
+          <div id="fc-modal-current" style="font-size: 18px; font-weight: 800; color: #fff;">$306.79</div>
+          <div id="fc-modal-buy" style="font-size: 12px; color: var(--text-muted);">Comprado a $426.61</div>
+        </div>
+      </div>
+
+      <div style="background: rgba(0,0,0,0.3); border-left: 4px solid var(--primary); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Análisis & Razonamiento Algorítmico</div>
+        <p id="fc-modal-reason" style="font-size: 14px; color: var(--text-main); line-height: 1.6;"></p>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+        <button type="button" class="btn btn-primary" onclick="app.closeForecastModal()">Entendido / Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: RESUMEN DE NOTICIA EN ESPAÑOL -->
+  <div class="modal-backdrop" id="modal-news">
+    <div class="modal-box" style="max-width: 640px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span>📰 Cobertura Financiera</span>
+          <span class="brand-badge" id="news-modal-symbol">TSLA</span>
+          <span id="news-modal-sentiment-badge" style="font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 700;"></span>
+        </div>
+        <button class="modal-close" onclick="app.closeNewsModal()">✕</button>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <h3 id="news-modal-title" style="font-size: 17px; font-weight: 700; color: #fff; line-height: 1.4; margin-bottom: 10px;"></h3>
+        <div style="font-size: 12px; color: var(--text-muted); display: flex; gap: 16px; flex-wrap: wrap; align-items: center; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px;">
+          <span>🏛️ Fuente: <strong id="news-modal-publisher" style="color: #38bdf8;"></strong></span>
+          <span>🕒 Publicado: <span id="news-modal-time" style="color: var(--text-main);"></span></span>
+        </div>
+      </div>
+
+      <div style="background: rgba(0,0,0,0.3); border-left: 4px solid var(--primary); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+          <span>📋 Hechos y Datos Reportados</span>
+        </div>
+        <p id="news-modal-summary" style="font-size: 14px; color: var(--text-main); line-height: 1.6; margin: 0;"></p>
+      </div>
+
+      <div id="news-modal-impact-container" style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); padding: 14px; border-radius: 8px; margin-bottom: 20px;">
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; color: var(--text-muted);">
+          💡 Lectura Táctica para la Cartera
+        </div>
+        <div id="news-modal-impact-text" style="font-size: 13px; color: var(--text-main); font-weight: 600;"></div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <a id="news-modal-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #38bdf8; text-decoration: none;">
+          <span>🌐 Abrir Artículo Completo en la Fuente Original</span> ↗
+        </a>
+        <button type="button" class="btn btn-primary" onclick="app.closeNewsModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DESGLOSE DE ANÁLISIS TÉCNICO DE CORTO PLAZO -->
+  <div class="modal-backdrop" id="modal-technical">
+    <div class="modal-box" style="max-width: 650px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>🎯 Diagnóstico Técnico de Corto Plazo</span>
+          <span class="brand-badge" id="ta-modal-symbol">PLTR</span>
+        </div>
+        <button class="modal-close" onclick="app.closeTechnicalModal()">✕</button>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: rgba(0,0,0,0.3); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-color);">
+        <div>
+          <div id="ta-modal-name" style="font-size: 15px; font-weight: 700; color: #fff;"></div>
+          <div style="font-size: 12px; color: var(--text-muted);">Cotización Actual: <strong id="ta-modal-price" style="color: #60a5fa;"></strong></div>
+        </div>
+        <div id="ta-modal-badge" class="badge-up" style="font-size: 13px; padding: 6px 14px; font-weight: bold;"></div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px;">
+        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">RSI (14d)</div>
+          <div id="ta-modal-rsi" style="font-size: 18px; font-weight: 800; margin-top: 4px;"></div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Media SMA 50</div>
+          <div id="ta-modal-sma50" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: #38bdf8;"></div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Media SMA 200</div>
+          <div id="ta-modal-sma200" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: #a855f7;"></div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Soporte Clave</div>
+          <div id="ta-modal-support" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: #10b981;"></div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Resistencia Clave</div>
+          <div id="ta-modal-resistance" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: #ef4444;"></div>
+        </div>
+      </div>
+
+      <div style="background: rgba(0,0,0,0.3); border-left: 4px solid var(--primary); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Fundamento & Análisis de Decisión Táctica</div>
+        <p id="ta-modal-reason" style="font-size: 14px; color: var(--text-main); line-height: 1.6;"></p>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+        <button type="button" class="btn btn-primary" onclick="app.closeTechnicalModal()">Entendido / Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS Principal -->
+  <script src="/js/app.js"></script>
+</body>
+</html>
