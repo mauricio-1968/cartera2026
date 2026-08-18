@@ -1003,25 +1003,28 @@ const app = {
     const selectElem = document.getElementById('sell-select-id');
 
     let optionsHtml = '';
-    openPositions.forEach(p => {
+    openPositions.forEach((p, idx) => {
       optionsHtml += `<option value="${p.id}" data-symbol="${p.symbol}" data-price="${p.livePrice}">${p.symbol} - ${p.quantity} acciones (Compradas a $${p.buy_price.toFixed(2)} - Actual: $${p.livePrice.toFixed(2)})</option>`;
     });
     selectElem.innerHTML = optionsHtml;
 
     const firstPos = openPositions[0];
+    selectElem.value = firstPos.id;
     this.openSellModal(firstPos.id, firstPos.symbol, firstPos.livePrice);
     if (groupSelect) groupSelect.style.display = 'block';
   },
 
   handlePositionSelectChange(selectElem) {
     const selectedOption = selectElem.options[selectElem.selectedIndex];
+    if (!selectedOption) return;
+
     const id = selectElem.value;
     const symbol = selectedOption.getAttribute('data-symbol');
     const price = selectedOption.getAttribute('data-price');
     
     document.getElementById('sell-id').value = id;
-    document.getElementById('sell-symbol').value = symbol;
-    document.getElementById('sell-price').value = price ? parseFloat(price).toFixed(2) : '';
+    document.getElementById('sell-symbol').value = symbol || '';
+    document.getElementById('sell-price').value = (price && !isNaN(price)) ? parseFloat(price).toFixed(2) : '';
   },
 
   openSellModal(id, symbol, livePrice) {
@@ -1029,8 +1032,8 @@ const app = {
     if (groupSelect) groupSelect.style.display = 'none';
 
     document.getElementById('sell-id').value = id;
-    document.getElementById('sell-symbol').value = symbol;
-    document.getElementById('sell-price').value = (livePrice !== undefined && livePrice !== null) ? parseFloat(livePrice).toFixed(2) : '';
+    document.getElementById('sell-symbol').value = symbol || '';
+    document.getElementById('sell-price').value = (livePrice !== undefined && livePrice !== null && !isNaN(livePrice)) ? parseFloat(livePrice).toFixed(2) : '';
     document.getElementById('sell-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('sell-notes').value = '';
     
@@ -1075,23 +1078,50 @@ const app = {
 
   async saveSell(e) {
     e.preventDefault();
-    const rawId = document.getElementById('sell-id').value;
+    const groupSelect = document.getElementById('group-select-position');
+    const selectElem = document.getElementById('sell-select-id');
+
+    let rawId = document.getElementById('sell-id').value;
+    let symbol = document.getElementById('sell-symbol').value;
     const rawPrice = document.getElementById('sell-price').value;
     const rawDate = document.getElementById('sell-date').value;
 
+    const openPositions = (this.data && this.data.openPositions) || [];
+
+    // Si se abrió desde el selector del header, sincronizar con la opción seleccionada
+    if (groupSelect && groupSelect.style.display !== 'none' && selectElem && selectElem.value) {
+      rawId = selectElem.value;
+      const selectedOption = selectElem.options[selectElem.selectedIndex];
+      if (selectedOption) {
+        symbol = selectedOption.getAttribute('data-symbol') || symbol;
+      }
+    }
+
+    let targetPos = null;
+    if (rawId) {
+      targetPos = openPositions.find(p => Number(p.id) === Number(rawId));
+    }
+    if (!targetPos && symbol) {
+      targetPos = openPositions.find(p => p.symbol.trim().toUpperCase() === symbol.trim().toUpperCase());
+    }
+    if (!targetPos && openPositions.length > 0) {
+      targetPos = openPositions[0];
+    }
+
+    if (!targetPos) {
+      alert('Error: No se encontró una posición abierta para vender.');
+      return;
+    }
+
     const payload = {
-      id: parseInt(rawId),
+      id: parseInt(targetPos.id),
       sell_date: rawDate || new Date().toISOString().split('T')[0],
       sell_price: parseFloat(rawPrice),
       notes: document.getElementById('sell-notes').value
     };
 
-    if (!payload.id || isNaN(payload.id)) {
-      alert('Error: No se ha seleccionado una posición válida para vender.');
-      return;
-    }
     if (isNaN(payload.sell_price) || payload.sell_price <= 0) {
-      alert('Error: Por favor ingresa un precio de venta válido.');
+      alert('Error: Por favor ingresa un precio de venta válido mayor a 0.');
       return;
     }
 
@@ -1104,6 +1134,7 @@ const app = {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al registrar venta');
       this.closeSellModal();
+      alert('✅ ' + (data.message || `Venta de ${targetPos.symbol} registrada con éxito.`));
       await this.fetchPortfolio();
       this.switchTab('closed');
     } catch (err) {
