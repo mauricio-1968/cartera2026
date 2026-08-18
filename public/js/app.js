@@ -953,13 +953,22 @@ const app = {
   async saveEdit(e) {
     e.preventDefault();
     const payload = {
-      id: document.getElementById('edit-id').value,
+      id: parseInt(document.getElementById('edit-id').value),
       buy_date: document.getElementById('edit-date').value,
-      quantity: document.getElementById('edit-qty').value,
-      buy_price: document.getElementById('edit-price').value,
-      stop_loss: document.getElementById('edit-stop').value,
+      quantity: parseFloat(document.getElementById('edit-qty').value),
+      buy_price: parseFloat(document.getElementById('edit-price').value),
+      stop_loss: document.getElementById('edit-stop').value ? parseFloat(document.getElementById('edit-stop').value) : null,
       notes: document.getElementById('edit-notes').value
     };
+
+    if (!payload.id || isNaN(payload.id)) {
+      alert('Error: ID de posición inválido.');
+      return;
+    }
+    if (isNaN(payload.quantity) || payload.quantity <= 0 || isNaN(payload.buy_price) || payload.buy_price <= 0) {
+      alert('Error: Cantidad y Precio deben ser números válidos mayores a 0.');
+      return;
+    }
 
     try {
       const res = await fetch('/api/transactions/edit', {
@@ -967,7 +976,8 @@ const app = {
         headers: this.getAuthHeaders(),
         body: JSON.stringify(payload)
       });
-      if (!res.ok) throw new Error('Error al actualizar');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al actualizar');
       this.closeEditModal();
       await this.fetchPortfolio();
     } catch (err) {
@@ -1175,41 +1185,6 @@ const app = {
       if (!res.ok) return;
       const data = await res.json();
       this.watchlist = data.watchlist || [];
-
-      // Sincronización con localStorage para evitar pérdida de datos si Render reinicia su almacenamiento efímero
-      const userId = this.currentUser ? this.currentUser.id : 1;
-      const storageKey = `portrack_watchlist_user_${userId}`;
-      const savedSymbols = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      const serverSymbols = this.watchlist.map(w => w.symbol.trim().toUpperCase());
-
-      // Si hay tickers guardados en el navegador que el servidor no tiene (ej: tras reinicio de Render), resincronizarlos
-      let missingSymbols = savedSymbols.filter(sym => !serverSymbols.includes(sym));
-      if (missingSymbols.length > 0) {
-        for (const sym of missingSymbols) {
-          try {
-            await fetch('/api/watchlist', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...this.getAuthHeaders()
-              },
-              body: JSON.stringify({ symbol: sym })
-            });
-          } catch (e) {}
-        }
-
-        // Volver a consultar la lista actualizada
-        const res2 = await fetch('/api/watchlist', { headers: this.getAuthHeaders() });
-        if (res2.ok) {
-          const data2 = await res2.json();
-          this.watchlist = data2.watchlist || [];
-        }
-      }
-
-      // Guardar lista actual en localStorage
-      const updatedSymbols = this.watchlist.map(w => w.symbol.trim().toUpperCase());
-      localStorage.setItem(storageKey, JSON.stringify(updatedSymbols));
-
       this.renderWatchlistTable(this.watchlist);
     } catch (err) {
       console.error('Error cargando watchlist:', err);
@@ -1297,15 +1272,6 @@ const app = {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al agregar empresa');
 
-      // Guardar en localStorage inmediatamente
-      const userId = this.currentUser ? this.currentUser.id : 1;
-      const storageKey = `portrack_watchlist_user_${userId}`;
-      const savedSymbols = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      if (!savedSymbols.includes(symbol)) {
-        savedSymbols.push(symbol);
-        localStorage.setItem(storageKey, JSON.stringify(savedSymbols));
-      }
-
       input.value = '';
       await this.fetchWatchlist();
     } catch (err) {
@@ -1324,13 +1290,6 @@ const app = {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al eliminar');
-
-      // Quitar de localStorage
-      const userId = this.currentUser ? this.currentUser.id : 1;
-      const storageKey = `portrack_watchlist_user_${userId}`;
-      let savedSymbols = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      savedSymbols = savedSymbols.filter(s => s !== cleanSymbol);
-      localStorage.setItem(storageKey, JSON.stringify(savedSymbols));
 
       await this.fetchWatchlist();
     } catch (err) {
