@@ -6,11 +6,7 @@ services:
     buildCommand: npm install --only=production --no-audit --no-fund
     startCommand: node server.js
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: portrack-db
-          property: connectionString
-
-databases:
-  - name: portrack-db
-    plan: free
+      - key: SUPABASE_URL
+        value: https://hjbbahrmfmfejwamihvy.supabase.co
+      - key: SUPABASE_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqYmJhaHJtZm1mZWp3YW1paHZ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzA3MDcwNiwiZXhwIjoyMTAyNjQ2NzA2fQ.X_2X0T1wfJ5o3sBgTr1uuFPGl60f1dSw4nM1WFKdcvg
