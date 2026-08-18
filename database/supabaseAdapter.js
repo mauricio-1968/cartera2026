@@ -1,8 +1,8 @@
 require('dotenv').config();
 const axios = require('axios');
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseUrl = process.env.SUPABASE_URL || 'https://hjbbahrmfmfejwamihvy.supabase.co';
+const supabaseKey = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqYmJhaHJtZm1mZWp3YW1paHZ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzA3MDcwNiwiZXhwIjoyMTAyNjQ2NzA2fQ.X_2X0T1wfJ5o3sBgTr1uuFPGl60f1dSw4nM1WFKdcvg';
 
 let client = null;
 if (supabaseUrl && supabaseKey) {
@@ -127,9 +127,9 @@ const supabaseDb = {
 
       // 3. SELECT COUNT(*) as count FROM users
       if (upperSql.includes('COUNT') && upperSql.includes('FROM USERS')) {
-        const res = await client.get('/users?select=count', { headers: { 'Prefer': 'count=exact' } });
+        const res = await client.get('/users?select=id&limit=1', { headers: { 'Prefer': 'count=exact' } });
         const count = res.headers['content-range'] ? parseInt(res.headers['content-range'].split('/')[1]) : (res.data ? res.data.length : 0);
-        return callback(null, { count });
+        return callback(null, { count: isNaN(count) ? 0 : count });
       }
 
       // 4. SELECT * FROM transactions WHERE id = ?
@@ -148,17 +148,17 @@ const supabaseDb = {
 
       // 6. SELECT COUNT(*) FROM transactions
       if (upperSql.includes('COUNT') && upperSql.includes('FROM TRANSACTIONS')) {
-        const res = await client.get('/transactions?select=count', { headers: { 'Prefer': 'count=exact' } });
+        const res = await client.get('/transactions?select=id&limit=1', { headers: { 'Prefer': 'count=exact' } });
         const count = res.headers['content-range'] ? parseInt(res.headers['content-range'].split('/')[1]) : (res.data ? res.data.length : 0);
-        return callback(null, { count });
+        return callback(null, { count: isNaN(count) ? 0 : count });
       }
 
       // 7. SELECT * FROM watchlist WHERE user_id = ? AND UPPER(symbol) = ?
       if (upperSql.includes('FROM WATCHLIST')) {
         if (upperSql.includes('COUNT')) {
-          const res = await client.get('/watchlist?select=count', { headers: { 'Prefer': 'count=exact' } });
+          const res = await client.get('/watchlist?select=id&limit=1', { headers: { 'Prefer': 'count=exact' } });
           const count = res.headers['content-range'] ? parseInt(res.headers['content-range'].split('/')[1]) : (res.data ? res.data.length : 0);
-          return callback(null, { count });
+          return callback(null, { count: isNaN(count) ? 0 : count });
         }
         const sym = String(params[params.length - 1] || '').trim().toUpperCase();
         const res = await client.get(`/watchlist?select=*&symbol=eq.${encodeURIComponent(sym)}`);

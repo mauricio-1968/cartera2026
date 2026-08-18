@@ -2,7 +2,10 @@ require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
 
-const isSupabase = !!(process.env.SUPABASE_URL && process.env.SUPABASE_KEY);
+const supabaseUrl = process.env.SUPABASE_URL || 'https://hjbbahrmfmfejwamihvy.supabase.co';
+const supabaseKey = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqYmJhaHJtZm1mZWp3YW1paHZ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzA3MDcwNiwiZXhwIjoyMTAyNjQ2NzA2fQ.X_2X0T1wfJ5o3sBgTr1uuFPGl60f1dSw4nM1WFKdcvg';
+
+const isSupabase = !!(supabaseUrl && supabaseKey);
 const isPostgres = !isSupabase && !!process.env.DATABASE_URL;
 
 if (isSupabase) {
