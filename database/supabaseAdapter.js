@@ -111,55 +111,57 @@ const supabaseDb = {
       const cleanSql = sql.trim();
       const upperSql = cleanSql.toUpperCase();
 
-      // 1. SELECT * FROM users WHERE email = ?
-      if (upperSql.includes('FROM USERS') && upperSql.includes('EMAIL')) {
-        const email = String(params[0] || '').trim().toLowerCase();
-        const res = await client.get(`/users?select=*&email=eq.${encodeURIComponent(email)}`);
-        return callback(null, res.data && res.data[0] ? res.data[0] : null);
-      }
-
-      // 2. SELECT * FROM users WHERE id = ?
-      if (upperSql.includes('FROM USERS') && upperSql.includes('ID =')) {
-        const id = params[0];
-        const res = await client.get(`/users?select=*&id=eq.${id}`);
-        return callback(null, res.data && res.data[0] ? res.data[0] : null);
-      }
-
-      // 3. SELECT COUNT(*) as count FROM users
-      if (upperSql.includes('COUNT') && upperSql.includes('FROM USERS')) {
-        const res = await client.get('/users?select=id&limit=1', { headers: { 'Prefer': 'count=exact' } });
-        const count = res.headers['content-range'] ? parseInt(res.headers['content-range'].split('/')[1]) : (res.data ? res.data.length : 0);
-        return callback(null, { count: isNaN(count) ? 0 : count });
-      }
-
-      // 4. SELECT * FROM transactions WHERE id = ?
-      if (upperSql.includes('FROM TRANSACTIONS') && upperSql.includes('ID =')) {
-        const id = params[0];
-        const res = await client.get(`/transactions?select=*&id=eq.${id}`);
-        return callback(null, res.data && res.data[0] ? res.data[0] : null);
-      }
-
-      // 5. SELECT * FROM transactions WHERE UPPER(symbol) = ? AND status = 'open'
-      if (upperSql.includes('FROM TRANSACTIONS') && (upperSql.includes('SYMBOL') || upperSql.includes('STATUS'))) {
-        const sym = String(params[0] || '').trim().toUpperCase();
-        const res = await client.get(`/transactions?select=*&symbol=eq.${encodeURIComponent(sym)}&status=eq.open&order=id.desc&limit=1`);
-        return callback(null, res.data && res.data[0] ? res.data[0] : null);
-      }
-
-      // 6. SELECT COUNT(*) FROM transactions
+      // 1. SELECT COUNT(*) as count FROM transactions
       if (upperSql.includes('COUNT') && upperSql.includes('FROM TRANSACTIONS')) {
         const res = await client.get('/transactions?select=id&limit=1', { headers: { 'Prefer': 'count=exact' } });
         const count = res.headers['content-range'] ? parseInt(res.headers['content-range'].split('/')[1]) : (res.data ? res.data.length : 0);
         return callback(null, { count: isNaN(count) ? 0 : count });
       }
 
-      // 7. SELECT * FROM watchlist WHERE user_id = ? AND UPPER(symbol) = ?
+      // 2. SELECT COUNT(*) as count FROM users
+      if (upperSql.includes('COUNT') && upperSql.includes('FROM USERS')) {
+        const res = await client.get('/users?select=id&limit=1', { headers: { 'Prefer': 'count=exact' } });
+        const count = res.headers['content-range'] ? parseInt(res.headers['content-range'].split('/')[1]) : (res.data ? res.data.length : 0);
+        return callback(null, { count: isNaN(count) ? 0 : count });
+      }
+
+      // 3. SELECT COUNT(*) as count FROM watchlist
+      if (upperSql.includes('COUNT') && upperSql.includes('FROM WATCHLIST')) {
+        const res = await client.get('/watchlist?select=id&limit=1', { headers: { 'Prefer': 'count=exact' } });
+        const count = res.headers['content-range'] ? parseInt(res.headers['content-range'].split('/')[1]) : (res.data ? res.data.length : 0);
+        return callback(null, { count: isNaN(count) ? 0 : count });
+      }
+
+      // 4. SELECT * FROM users WHERE email = ?
+      if (upperSql.includes('FROM USERS') && upperSql.includes('EMAIL')) {
+        const email = String(params[0] || '').trim().toLowerCase();
+        const res = await client.get(`/users?select=*&email=eq.${encodeURIComponent(email)}`);
+        return callback(null, res.data && res.data[0] ? res.data[0] : null);
+      }
+
+      // 5. SELECT * FROM users WHERE id = ?
+      if (upperSql.includes('FROM USERS') && (upperSql.includes('WHERE ID =') || upperSql.includes('WHERE ID='))) {
+        const id = params[0];
+        const res = await client.get(`/users?select=*&id=eq.${id}`);
+        return callback(null, res.data && res.data[0] ? res.data[0] : null);
+      }
+
+      // 6. SELECT * FROM transactions WHERE id = ?
+      if (upperSql.includes('FROM TRANSACTIONS') && (upperSql.includes('WHERE ID =') || upperSql.includes('WHERE ID='))) {
+        const id = params[0];
+        const res = await client.get(`/transactions?select=*&id=eq.${id}`);
+        return callback(null, res.data && res.data[0] ? res.data[0] : null);
+      }
+
+      // 7. SELECT * FROM transactions WHERE UPPER(symbol) = ? AND status = 'open'
+      if (upperSql.includes('FROM TRANSACTIONS') && (upperSql.includes('SYMBOL') || upperSql.includes('STATUS'))) {
+        const sym = String(params[0] || '').trim().toUpperCase();
+        const res = await client.get(`/transactions?select=*&symbol=eq.${encodeURIComponent(sym)}&status=eq.open&order=id.desc&limit=1`);
+        return callback(null, res.data && res.data[0] ? res.data[0] : null);
+      }
+
+      // 8. SELECT * FROM watchlist WHERE user_id = ? AND UPPER(symbol) = ?
       if (upperSql.includes('FROM WATCHLIST')) {
-        if (upperSql.includes('COUNT')) {
-          const res = await client.get('/watchlist?select=id&limit=1', { headers: { 'Prefer': 'count=exact' } });
-          const count = res.headers['content-range'] ? parseInt(res.headers['content-range'].split('/')[1]) : (res.data ? res.data.length : 0);
-          return callback(null, { count: isNaN(count) ? 0 : count });
-        }
         const sym = String(params[params.length - 1] || '').trim().toUpperCase();
         const res = await client.get(`/watchlist?select=*&symbol=eq.${encodeURIComponent(sym)}`);
         return callback(null, res.data && res.data[0] ? res.data[0] : null);
