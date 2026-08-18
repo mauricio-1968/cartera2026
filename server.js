@@ -318,25 +318,39 @@ app.post('/api/transactions/buy', authenticateToken, (req, res) => {
 
 // 4. Registrar una Venta (SELL)
 app.post('/api/transactions/sell', authenticateToken, (req, res) => {
-  const userId = parseInt(req.user && req.user.id) || 1;
-  const { id, sell_date, sell_price, notes } = req.body;
+  let { id, symbol, sell_date, sell_price, notes } = req.body;
 
-  if (!id || sell_price === undefined || sell_price === null || sell_price === '') {
-    return res.status(400).json({ error: 'ID de transacción y precio de venta son requeridos' });
+  if (sell_price !== undefined && sell_price !== null && sell_price !== '') {
+    sell_price = parseFloat(String(sell_price).replace(',', '.').trim());
   }
 
-  const targetId = parseInt(id);
-  const sPrice = parseFloat(sell_price);
-  if (isNaN(sPrice) || sPrice <= 0) {
-    return res.status(400).json({ error: 'Por favor ingresa un precio de venta válido mayor a 0' });
+  if (!sell_price || isNaN(sell_price) || sell_price <= 0) {
+    return res.status(400).json({ error: 'Por favor ingresa un precio de venta válido mayor a 0.' });
   }
 
+  const sPrice = sell_price;
   const sDate = sell_date || new Date().toISOString().split('T')[0];
+  const targetId = (id !== undefined && id !== null && String(id).trim() !== '') ? parseInt(id) : null;
+  const cleanSymbol = symbol ? symbol.trim().toUpperCase() : null;
 
-  db.get('SELECT * FROM transactions WHERE id = ?', [targetId], (err, row) => {
+  let findSql = '';
+  let findParams = [];
+
+  if (targetId && !isNaN(targetId)) {
+    findSql = 'SELECT * FROM transactions WHERE id = ?';
+    findParams = [targetId];
+  } else if (cleanSymbol) {
+    findSql = "SELECT * FROM transactions WHERE UPPER(symbol) = ? AND status = 'open' ORDER BY id DESC LIMIT 1";
+    findParams = [cleanSymbol];
+  } else {
+    return res.status(400).json({ error: 'ID de transacción o símbolo de acción es requerido.' });
+  }
+
+  db.get(findSql, findParams, (err, row) => {
     if (err) return res.status(500).json({ error: 'Error consultando base de datos: ' + err.message });
-    if (!row) return res.status(404).json({ error: `Posición con ID #${targetId} no encontrada en la cartera` });
+    if (!row) return res.status(404).json({ error: `Posición ${cleanSymbol || '#' + targetId} no encontrada entre las posiciones abiertas.` });
 
+    const posId = row.id;
     const sQty = parseFloat(row.quantity || 0);
     const buyPrice = parseFloat(row.buy_price || 0);
     const buyTotal = parseFloat(row.buy_total || (sQty * buyPrice));
@@ -372,11 +386,11 @@ app.post('/api/transactions/sell', authenticateToken, (req, res) => {
 
     const finalNotes = notes !== undefined && notes !== null ? notes : (row.notes || '');
 
-    db.run(sql, [sDate, sQty, sPrice, sellTotal, realizedGain, daysHeld, returnPercent, finalNotes, targetId], function(err) {
+    db.run(sql, [sDate, sQty, sPrice, sellTotal, realizedGain, daysHeld, returnPercent, finalNotes, posId], function(err) {
       if (err) return res.status(500).json({ error: 'Error al actualizar transacción: ' + err.message });
       res.json({
         message: `Venta de ${row.symbol} registrada con éxito. Ganancia: ${realizedGain >= 0 ? '+' : ''}$${realizedGain} (${returnPercent}%)`,
-        id: targetId,
+        id: posId,
         symbol: row.symbol,
         realizedGain,
         returnPercent

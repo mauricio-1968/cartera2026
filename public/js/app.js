@@ -1113,17 +1113,19 @@ const app = {
       return;
     }
 
-    const payload = {
-      id: parseInt(targetPos.id),
-      sell_date: rawDate || new Date().toISOString().split('T')[0],
-      sell_price: parseFloat(rawPrice),
-      notes: document.getElementById('sell-notes').value
-    };
-
-    if (isNaN(payload.sell_price) || payload.sell_price <= 0) {
+    const cleanPrice = parseFloat(String(rawPrice).replace(',', '.'));
+    if (isNaN(cleanPrice) || cleanPrice <= 0) {
       alert('Error: Por favor ingresa un precio de venta válido mayor a 0.');
       return;
     }
+
+    const payload = {
+      id: parseInt(targetPos.id),
+      symbol: targetPos.symbol,
+      sell_date: rawDate || new Date().toISOString().split('T')[0],
+      sell_price: cleanPrice,
+      notes: document.getElementById('sell-notes').value
+    };
 
     try {
       const res = await fetch('/api/transactions/sell', {
