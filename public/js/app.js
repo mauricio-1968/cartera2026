@@ -992,7 +992,6 @@ const app = {
     const groupSelect = document.getElementById('group-select-position');
     const selectElem = document.getElementById('sell-select-id');
 
-    groupSelect.style.display = 'block';
     let optionsHtml = '';
     openPositions.forEach(p => {
       optionsHtml += `<option value="${p.id}" data-symbol="${p.symbol}" data-price="${p.livePrice}">${p.symbol} - ${p.quantity} acciones (Compradas a $${p.buy_price.toFixed(2)} - Actual: $${p.livePrice.toFixed(2)})</option>`;
@@ -1001,6 +1000,7 @@ const app = {
 
     const firstPos = openPositions[0];
     this.openSellModal(firstPos.id, firstPos.symbol, firstPos.livePrice);
+    if (groupSelect) groupSelect.style.display = 'block';
   },
 
   handlePositionSelectChange(selectElem) {
@@ -1011,14 +1011,19 @@ const app = {
     
     document.getElementById('sell-id').value = id;
     document.getElementById('sell-symbol').value = symbol;
-    document.getElementById('sell-price').value = price;
+    document.getElementById('sell-price').value = price ? parseFloat(price).toFixed(2) : '';
   },
 
   openSellModal(id, symbol, livePrice) {
-    document.getElementById('group-select-position').style.display = 'none';
+    const groupSelect = document.getElementById('group-select-position');
+    if (groupSelect) groupSelect.style.display = 'none';
+
     document.getElementById('sell-id').value = id;
     document.getElementById('sell-symbol').value = symbol;
-    document.getElementById('sell-price').value = livePrice;
+    document.getElementById('sell-price').value = (livePrice !== undefined && livePrice !== null) ? parseFloat(livePrice).toFixed(2) : '';
+    document.getElementById('sell-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('sell-notes').value = '';
+    
     document.getElementById('modal-sell').classList.add('active');
   },
   closeSellModal() {
@@ -1036,9 +1041,9 @@ const app = {
     const payload = {
       symbol: document.getElementById('buy-symbol').value,
       buy_date: document.getElementById('buy-date').value,
-      quantity: qty,
-      buy_price: document.getElementById('buy-price').value,
-      stop_loss: document.getElementById('buy-stop').value,
+      quantity: parseFloat(qty),
+      buy_price: parseFloat(document.getElementById('buy-price').value),
+      stop_loss: document.getElementById('buy-stop').value ? parseFloat(document.getElementById('buy-stop').value) : null,
       notes: document.getElementById('buy-notes').value
     };
 
@@ -1048,7 +1053,8 @@ const app = {
         headers: this.getAuthHeaders(),
         body: JSON.stringify(payload)
       });
-      if (!res.ok) throw new Error('Error al registrar compra');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al registrar compra');
       this.closeBuyModal();
       await this.fetchPortfolio();
       this.switchTab('open');
@@ -1059,12 +1065,25 @@ const app = {
 
   async saveSell(e) {
     e.preventDefault();
+    const rawId = document.getElementById('sell-id').value;
+    const rawPrice = document.getElementById('sell-price').value;
+    const rawDate = document.getElementById('sell-date').value;
+
     const payload = {
-      id: document.getElementById('sell-id').value,
-      sell_date: document.getElementById('sell-date').value,
-      sell_price: document.getElementById('sell-price').value,
+      id: parseInt(rawId),
+      sell_date: rawDate || new Date().toISOString().split('T')[0],
+      sell_price: parseFloat(rawPrice),
       notes: document.getElementById('sell-notes').value
     };
+
+    if (!payload.id || isNaN(payload.id)) {
+      alert('Error: No se ha seleccionado una posición válida para vender.');
+      return;
+    }
+    if (isNaN(payload.sell_price) || payload.sell_price <= 0) {
+      alert('Error: Por favor ingresa un precio de venta válido.');
+      return;
+    }
 
     try {
       const res = await fetch('/api/transactions/sell', {
@@ -1072,7 +1091,8 @@ const app = {
         headers: this.getAuthHeaders(),
         body: JSON.stringify(payload)
       });
-      if (!res.ok) throw new Error('Error al registrar venta');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al registrar venta');
       this.closeSellModal();
       await this.fetchPortfolio();
       this.switchTab('closed');

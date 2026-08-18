@@ -318,31 +318,43 @@ app.post('/api/transactions/buy', authenticateToken, (req, res) => {
 
 // 4. Registrar una Venta (SELL)
 app.post('/api/transactions/sell', authenticateToken, (req, res) => {
-  const userId = req.user.id;
+  const userId = parseInt(req.user && req.user.id) || 1;
   const { id, sell_date, sell_price, notes } = req.body;
 
-  if (!id || !sell_price) {
+  if (!id || sell_price === undefined || sell_price === null || sell_price === '') {
     return res.status(400).json({ error: 'ID de transacción y precio de venta son requeridos' });
   }
 
   const targetId = parseInt(id);
   const sPrice = parseFloat(sell_price);
+  if (isNaN(sPrice) || sPrice <= 0) {
+    return res.status(400).json({ error: 'Por favor ingresa un precio de venta válido mayor a 0' });
+  }
+
   const sDate = sell_date || new Date().toISOString().split('T')[0];
 
-  db.get('SELECT * FROM transactions WHERE id = ? AND user_id = ?', [targetId, userId], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!row) return res.status(404).json({ error: 'Posición no encontrada' });
+  db.get('SELECT * FROM transactions WHERE id = ?', [targetId], (err, row) => {
+    if (err) return res.status(500).json({ error: 'Error consultando base de datos: ' + err.message });
+    if (!row) return res.status(404).json({ error: `Posición con ID #${targetId} no encontrada en la cartera` });
 
-    const sQty = parseFloat(row.quantity);
-    const buyTotal = parseFloat(row.buy_total);
-    const sellTotal = sQty * sPrice;
-    const realizedGain = sellTotal - buyTotal;
-    const returnPercent = buyTotal > 0 ? (realizedGain / buyTotal) * 100 : 0;
+    const sQty = parseFloat(row.quantity || 0);
+    const buyPrice = parseFloat(row.buy_price || 0);
+    const buyTotal = parseFloat(row.buy_total || (sQty * buyPrice));
+    const sellTotal = Number((sQty * sPrice).toFixed(2));
+    const realizedGain = Number((sellTotal - buyTotal).toFixed(2));
+    const returnPercent = buyTotal > 0 ? Number(((realizedGain / buyTotal) * 100).toFixed(2)) : 0;
 
-    const bDate = new Date(row.buy_date || Date.now());
-    const sDateObj = new Date(sDate);
-    const diffTime = Math.abs(sDateObj - bDate);
-    const daysHeld = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+    let daysHeld = 1;
+    if (row.buy_date) {
+      try {
+        const bDate = new Date(row.buy_date);
+        const sDateObj = new Date(sDate);
+        const diffTime = Math.abs(sDateObj - bDate);
+        daysHeld = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+      } catch (e) {
+        daysHeld = 1;
+      }
+    }
 
     const sql = `
       UPDATE transactions SET
@@ -355,12 +367,20 @@ app.post('/api/transactions/sell', authenticateToken, (req, res) => {
         days_held = ?,
         return_percent = ?,
         notes = ?
-      WHERE id = ? AND user_id = ?
+      WHERE id = ?
     `;
 
-    db.run(sql, [sDate, sQty, sPrice, sellTotal, realizedGain, daysHeld, returnPercent, notes || row.notes, targetId, userId], function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ message: 'Venta realizada y posición cerrada con éxito', id: targetId });
+    const finalNotes = notes !== undefined && notes !== null ? notes : (row.notes || '');
+
+    db.run(sql, [sDate, sQty, sPrice, sellTotal, realizedGain, daysHeld, returnPercent, finalNotes, targetId], function(err) {
+      if (err) return res.status(500).json({ error: 'Error al actualizar transacción: ' + err.message });
+      res.json({
+        message: `Venta de ${row.symbol} registrada con éxito. Ganancia: ${realizedGain >= 0 ? '+' : ''}$${realizedGain} (${returnPercent}%)`,
+        id: targetId,
+        symbol: row.symbol,
+        realizedGain,
+        returnPercent
+      });
     });
   });
 });
