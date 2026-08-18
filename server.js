@@ -204,9 +204,18 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
     let totalRealizedGain = 0;
     let winningTrades = 0;
 
-    const formattedClosedRows = closedRows.map(row => {
+    // Ordenar posiciones cerradas por fecha de venta DESC (las ventas más recientes arriba de todo)
+    const sortedClosedRows = [...closedRows].sort((a, b) => {
+      const dateA = a.sell_date ? new Date(a.sell_date).getTime() : (a.buy_date ? new Date(a.buy_date).getTime() : 0);
+      const dateB = b.sell_date ? new Date(b.sell_date).getTime() : (b.buy_date ? new Date(b.buy_date).getTime() : 0);
+      return (dateB - dateA) || ((b.id || 0) - (a.id || 0));
+    });
+
+    const formattedClosedRows = sortedClosedRows.map(row => {
       const buyTotal = parseFloat(row.buy_total || 0);
-      const sellTotal = parseFloat(row.sell_total || (parseFloat(row.quantity) * parseFloat(row.sell_price || row.buy_price)));
+      const sQty = parseFloat(row.sell_quantity || row.quantity || 0);
+      const sPrice = parseFloat(row.sell_price || 0);
+      const sellTotal = parseFloat(row.sell_total || (sQty * sPrice));
       const gain = row.realized_gain !== undefined && row.realized_gain !== null ? parseFloat(row.realized_gain) : (sellTotal - buyTotal);
 
       totalClosedInvested += buyTotal;
@@ -217,12 +226,14 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
       return {
         ...row,
         quantity: parseFloat(row.quantity),
-        buy_price: parseFloat(row.buy_price),
-        buy_total: buyTotal,
-        sell_price: parseFloat(row.sell_price || 0),
-        sell_total: sellTotal,
-        realized_gain: gain,
-        return_percent: parseFloat(row.return_percent || (buyTotal > 0 ? (gain / buyTotal) * 100 : 0))
+        buy_price: parseFloat(row.buy_price || 0),
+        buy_total: Number(buyTotal.toFixed(2)),
+        sell_date: row.sell_date || '',
+        sell_quantity: sQty,
+        sell_price: Number(sPrice.toFixed(2)),
+        sell_total: Number(sellTotal.toFixed(2)),
+        realized_gain: Number(gain.toFixed(2)),
+        return_percent: Number((row.return_percent !== undefined && row.return_percent !== null ? parseFloat(row.return_percent) : (buyTotal > 0 ? (gain / buyTotal) * 100 : 0)).toFixed(2))
       };
     });
 
