@@ -203,6 +203,27 @@ const supabaseDb = {
             status: 'open',
             notes: params[8] || ''
           };
+        } else if (params.length === 15) {
+          record = {
+            user_id: params[0] || 1,
+            symbol: params[1],
+            original_name: params[2],
+            type: 'BUY',
+            buy_date: params[3],
+            quantity: params[4],
+            buy_price: params[5],
+            buy_total: params[6],
+            stop_loss: null,
+            status: 'closed',
+            sell_date: params[7],
+            sell_quantity: params[8],
+            sell_price: params[9],
+            sell_total: params[10],
+            realized_gain: params[11],
+            days_held: params[12],
+            return_percent: params[13],
+            notes: params[14] || ''
+          };
         } else if (params.length >= 17) {
           record = {
             user_id: params[0] || 1,
@@ -233,7 +254,31 @@ const supabaseDb = {
 
       // 2. UPDATE transactions (VENTA O EDICIÓN)
       if (upperSql.startsWith('UPDATE TRANSACTIONS')) {
-        if (upperSql.includes("STATUS = 'CLOSED'") || upperSql.includes('STATUS = ?') || upperSql.includes('REALIZED_GAIN = ?')) {
+        if (params.length >= 14) {
+          // Edición completa de transacción cerrada:
+          // [cleanSymbol, original_name, bDate, numQty, numBuyPrice, buyTotal, sDate, numQty, numSellPrice, sellTotal, realizedGain, daysHeld, returnPercent, notes, targetId, userId?]
+          const targetId = params[14];
+          const updateData = {
+            symbol: params[0],
+            original_name: params[1],
+            buy_date: params[2],
+            quantity: params[3],
+            buy_price: params[4],
+            buy_total: params[5],
+            sell_date: params[6],
+            sell_quantity: params[7],
+            sell_price: params[8],
+            sell_total: params[9],
+            realized_gain: params[10],
+            days_held: params[11],
+            return_percent: params[12],
+            notes: params[13] || ''
+          };
+
+          const res = await client.patch(`/transactions?id=eq.${targetId}`, updateData);
+          return callback.call({ changes: res.data ? res.data.length : 1 }, null);
+        } else if (upperSql.includes("STATUS = 'CLOSED'") || upperSql.includes('STATUS = ?') || upperSql.includes('REALIZED_GAIN = ?')) {
+          // Venta de posición abierta: [sDate, sQty, sPrice, sellTotal, realizedGain, daysHeld, returnPercent, finalNotes, posId]
           const posId = params[params.length - 1];
           const updateData = {
             status: 'closed',
@@ -250,7 +295,8 @@ const supabaseDb = {
           const res = await client.patch(`/transactions?id=eq.${posId}`, updateData);
           return callback.call({ changes: res.data ? res.data.length : 1 }, null);
         } else {
-          const targetId = params[params.length - 1];
+          // Edición de posición abierta: [buy_date, numQty, numPrice, buyTotal, numStopLoss, notes, targetId, userId]
+          const targetId = params[params.length - 2] || params[params.length - 1];
           const updateData = {
             buy_date: params[0],
             quantity: params[1],

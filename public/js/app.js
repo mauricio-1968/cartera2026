@@ -819,7 +819,7 @@ const app = {
   renderClosedTable(closedPositions) {
     const tbody = document.getElementById('tbody-closed');
     if (!closedPositions || closedPositions.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: var(--text-muted);">No hay ventas registradas en el historial.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-muted); padding: 20px;">No hay ventas registradas en el historial.</td></tr>`;
       return;
     }
 
@@ -853,6 +853,16 @@ const app = {
             </span>
           </td>
           <td>${p.days_held || 0}d</td>
+          <td style="text-align: center;">
+            <div style="display: flex; gap: 6px; justify-content: center;">
+              <button class="btn btn-secondary" style="padding: 5px 9px; font-size: 11px;" onclick="app.openEditClosedModal(${p.id})" title="Editar Venta">
+                ✏️
+              </button>
+              <button class="btn btn-danger" style="padding: 5px 9px; font-size: 11px; background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.4); color: #f87171;" onclick="app.deleteTransaction(${p.id}, '${p.symbol}')" title="Eliminar Registro">
+                🗑️
+              </button>
+            </div>
+          </td>
         </tr>
       `;
     });
@@ -1354,6 +1364,196 @@ const app = {
 
   closeTechnicalModal() {
     document.getElementById('modal-technical').classList.remove('active');
+  },
+
+  // ==========================================
+  // GESTIÓN DE HISTORIAL DE VENTAS (REINGRESO, EDICIÓN Y ELIMINACIÓN)
+  // ==========================================
+
+  openAddHistoricalModal() {
+    document.getElementById('hist-symbol').value = '';
+    document.getElementById('hist-name').value = '';
+    document.getElementById('hist-buy-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('hist-buy-price').value = '';
+    document.getElementById('hist-sell-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('hist-sell-price').value = '';
+    document.getElementById('hist-qty').value = '';
+    document.getElementById('hist-notes').value = '';
+    this.calcHistoricalPreview();
+    document.getElementById('modal-add-historical').classList.add('active');
+  },
+
+  closeAddHistoricalModal() {
+    document.getElementById('modal-add-historical').classList.remove('active');
+  },
+
+  calcHistoricalPreview() {
+    const qty = parseFloat(String(document.getElementById('hist-qty').value).replace(',', '.')) || 0;
+    const bPrice = parseFloat(String(document.getElementById('hist-buy-price').value).replace(',', '.')) || 0;
+    const sPrice = parseFloat(String(document.getElementById('hist-sell-price').value).replace(',', '.')) || 0;
+
+    const bTotal = qty * bPrice;
+    const sTotal = qty * sPrice;
+    const gain = sTotal - bTotal;
+    const returnPct = bTotal > 0 ? (gain / bTotal) * 100 : 0;
+
+    document.getElementById('hist-prev-buy-total').innerText = `$${bTotal.toFixed(2)}`;
+    document.getElementById('hist-prev-sell-total').innerText = `$${sTotal.toFixed(2)}`;
+
+    const gainElem = document.getElementById('hist-prev-gain');
+    gainElem.innerText = `${gain >= 0 ? '+' : ''}$${gain.toFixed(2)}`;
+    gainElem.style.color = gain >= 0 ? '#10b981' : '#ef4444';
+
+    const retElem = document.getElementById('hist-prev-return');
+    retElem.innerText = `${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}%`;
+    retElem.style.color = returnPct >= 0 ? '#10b981' : '#ef4444';
+  },
+
+  async saveHistoricalTransaction(e) {
+    e.preventDefault();
+    const symbol = document.getElementById('hist-symbol').value.trim().toUpperCase();
+    const name = document.getElementById('hist-name').value.trim();
+    const buy_date = document.getElementById('hist-buy-date').value;
+    const buy_price = parseFloat(String(document.getElementById('hist-buy-price').value).replace(',', '.'));
+    const sell_date = document.getElementById('hist-sell-date').value;
+    const sell_price = parseFloat(String(document.getElementById('hist-sell-price').value).replace(',', '.'));
+    const quantity = parseFloat(String(document.getElementById('hist-qty').value).replace(',', '.'));
+    const notes = document.getElementById('hist-notes').value.trim();
+
+    if (!symbol || isNaN(buy_price) || isNaN(sell_price) || isNaN(quantity) || quantity <= 0) {
+      alert('Por favor completa los campos requeridos con valores válidos.');
+      return;
+    }
+
+    const payload = { symbol, original_name: name || symbol, buy_date, buy_price, sell_date, sell_price, quantity, notes };
+
+    try {
+      const res = await fetch('/api/transactions/historical', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeaders()
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al guardar venta histórica');
+
+      this.closeAddHistoricalModal();
+      alert('✅ ' + (data.message || `Operación de ${symbol} registrada con éxito en el historial.`));
+      await this.fetchPortfolio();
+      this.switchTab('closed');
+    } catch (err) {
+      alert('Error registrando venta histórica: ' + err.message);
+    }
+  },
+
+  openEditClosedModal(id) {
+    const closedPositions = (this.data && this.data.closedPositions) || [];
+    const item = closedPositions.find(p => Number(p.id) === Number(id));
+    if (!item) {
+      alert('No se encontró el registro seleccionado.');
+      return;
+    }
+
+    document.getElementById('edit-closed-id').value = item.id;
+    document.getElementById('edit-closed-symbol').value = item.symbol || '';
+    document.getElementById('edit-closed-name').value = item.original_name || item.symbol || '';
+    document.getElementById('edit-closed-buy-date').value = item.buy_date || '';
+    document.getElementById('edit-closed-buy-price').value = item.buy_price || '';
+    document.getElementById('edit-closed-sell-date').value = item.sell_date || '';
+    document.getElementById('edit-closed-sell-price').value = item.sell_price || '';
+    document.getElementById('edit-closed-qty').value = item.quantity || '';
+    document.getElementById('edit-closed-notes').value = item.notes || '';
+
+    this.calcEditClosedPreview();
+    document.getElementById('modal-edit-closed').classList.add('active');
+  },
+
+  closeEditClosedModal() {
+    document.getElementById('modal-edit-closed').classList.remove('active');
+  },
+
+  calcEditClosedPreview() {
+    const qty = parseFloat(String(document.getElementById('edit-closed-qty').value).replace(',', '.')) || 0;
+    const bPrice = parseFloat(String(document.getElementById('edit-closed-buy-price').value).replace(',', '.')) || 0;
+    const sPrice = parseFloat(String(document.getElementById('edit-closed-sell-price').value).replace(',', '.')) || 0;
+
+    const bTotal = qty * bPrice;
+    const sTotal = qty * sPrice;
+    const gain = sTotal - bTotal;
+    const returnPct = bTotal > 0 ? (gain / bTotal) * 100 : 0;
+
+    document.getElementById('edit-closed-prev-buy-total').innerText = `$${bTotal.toFixed(2)}`;
+    document.getElementById('edit-closed-prev-sell-total').innerText = `$${sTotal.toFixed(2)}`;
+
+    const gainElem = document.getElementById('edit-closed-prev-gain');
+    gainElem.innerText = `${gain >= 0 ? '+' : ''}$${gain.toFixed(2)}`;
+    gainElem.style.color = gain >= 0 ? '#10b981' : '#ef4444';
+
+    const retElem = document.getElementById('edit-closed-prev-return');
+    retElem.innerText = `${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}%`;
+    retElem.style.color = returnPct >= 0 ? '#10b981' : '#ef4444';
+  },
+
+  async saveEditClosedTransaction(e) {
+    e.preventDefault();
+    const id = document.getElementById('edit-closed-id').value;
+    const symbol = document.getElementById('edit-closed-symbol').value.trim().toUpperCase();
+    const name = document.getElementById('edit-closed-name').value.trim();
+    const buy_date = document.getElementById('edit-closed-buy-date').value;
+    const buy_price = parseFloat(String(document.getElementById('edit-closed-buy-price').value).replace(',', '.'));
+    const sell_date = document.getElementById('edit-closed-sell-date').value;
+    const sell_price = parseFloat(String(document.getElementById('edit-closed-sell-price').value).replace(',', '.'));
+    const quantity = parseFloat(String(document.getElementById('edit-closed-qty').value).replace(',', '.'));
+    const notes = document.getElementById('edit-closed-notes').value.trim();
+
+    if (!id || !symbol || isNaN(buy_price) || isNaN(sell_price) || isNaN(quantity) || quantity <= 0) {
+      alert('Por favor completa los campos requeridos con valores válidos.');
+      return;
+    }
+
+    const payload = { id, symbol, original_name: name || symbol, buy_date, buy_price, sell_date, sell_price, quantity, notes };
+
+    try {
+      const res = await fetch('/api/transactions/edit-closed', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeaders()
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al actualizar el registro');
+
+      this.closeEditClosedModal();
+      alert('✅ ' + (data.message || `Registro de ${symbol} actualizado con éxito.`));
+      await this.fetchPortfolio();
+      this.switchTab('closed');
+    } catch (err) {
+      alert('Error actualizando registro: ' + err.message);
+    }
+  },
+
+  async deleteTransaction(id, symbol) {
+    if (!confirm(`⚠️ ¿Estás seguro de eliminar el registro de ${symbol || 'esta transacción'} (ID #${id}) de la base de datos?\n\nEsta acción eliminará el registro de forma permanente de tu historial.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/transactions/${id}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders()
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al eliminar registro');
+
+      alert(`🗑️ Registro #${id} (${symbol}) eliminado con éxito.`);
+      await this.fetchPortfolio();
+    } catch (err) {
+      alert('Error eliminando la transacción: ' + err.message);
+    }
   }
 };
 

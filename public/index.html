@@ -267,8 +267,11 @@
     <!-- TAB 3: POSICIONES CERRADAS -->
     <section id="tab-closed" style="display: none;">
       <div class="card">
-        <div class="card-title">
+        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
           <span>🔴 Historial de Compras y Ventas Realizadas</span>
+          <button class="btn btn-primary" onclick="app.openAddHistoricalModal()" style="padding: 6px 14px; font-size: 13px; font-weight: 700;">
+            ➕ Registrar Venta Histórica / Reingresar Registro
+          </button>
         </div>
         <div class="table-responsive">
           <table class="data-table">
@@ -285,6 +288,7 @@
                 <th>Ganancia Realizada</th>
                 <th>Retorno %</th>
                 <th>Días</th>
+                <th style="text-align: center; background: rgba(239, 68, 68, 0.15); color: #f87171;">Acciones</th>
               </tr>
             </thead>
             <tbody id="tbody-closed">
@@ -675,7 +679,169 @@
     </div>
   </div>
 
+  <!-- MODAL: REGISTRAR VENTA HISTÓRICA MANUAL (NUEVA O REINGRESO) -->
+  <div class="modal-backdrop" id="modal-add-historical">
+    <div class="modal-box" style="max-width: 600px;">
+      <div class="modal-header">
+        <div class="modal-title">➕ Registrar Operación en Historial de Ventas</div>
+        <button class="modal-close" onclick="app.closeAddHistoricalModal()">✕</button>
+      </div>
+      <form onsubmit="app.saveHistoricalTransaction(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Ticker / Símbolo Acción *</label>
+            <input type="text" id="hist-symbol" class="form-input" placeholder="ej. CSCO, NVDA, TSLA" style="text-transform: uppercase; font-weight: bold; color: #38bdf8;" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nombre Empresa (Opcional)</label>
+            <input type="text" id="hist-name" class="form-input" placeholder="ej. Cisco Systems">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Fecha de Compra *</label>
+            <input type="date" id="hist-buy-date" class="form-input" required onchange="app.calcHistoricalPreview()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Precio Compra US$ *</label>
+            <input type="number" step="any" id="hist-buy-price" class="form-input" placeholder="ej. 111.55" required oninput="app.calcHistoricalPreview()">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Fecha de Venta *</label>
+            <input type="date" id="hist-sell-date" class="form-input" required onchange="app.calcHistoricalPreview()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Precio Venta US$ *</label>
+            <input type="number" step="any" id="hist-sell-price" class="form-input" placeholder="ej. 112.50" required oninput="app.calcHistoricalPreview()">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Cantidad de Acciones *</label>
+            <input type="number" step="any" id="hist-qty" class="form-input" placeholder="ej. 1.52039444" required oninput="app.calcHistoricalPreview()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notas / Observaciones</label>
+            <input type="text" id="hist-notes" class="form-input" placeholder="ej. Reingreso de operación corregida">
+          </div>
+        </div>
+
+        <!-- Vista Previa de Cálculos -->
+        <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; margin: 16px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;">
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">Total Invertido</div>
+            <div id="hist-prev-buy-total" style="font-size: 14px; font-weight: 700; color: #fff;">$0.00</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">Total Recuperado</div>
+            <div id="hist-prev-sell-total" style="font-size: 14px; font-weight: 700; color: #fff;">$0.00</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">Ganancia / Pérdida</div>
+            <div id="hist-prev-gain" style="font-size: 14px; font-weight: 800; color: #10b981;">+$0.00</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">Retorno %</div>
+            <div id="hist-prev-return" style="font-size: 14px; font-weight: 800; color: #10b981;">+0.00%</div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeAddHistoricalModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar en Historial</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EDITAR VENTA HISTÓRICA EXISTENTE -->
+  <div class="modal-backdrop" id="modal-edit-closed">
+    <div class="modal-box" style="max-width: 600px;">
+      <div class="modal-header">
+        <div class="modal-title">✏️ Editar Registro en Historial de Ventas</div>
+        <button class="modal-close" onclick="app.closeEditClosedModal()">✕</button>
+      </div>
+      <form onsubmit="app.saveEditClosedTransaction(event)">
+        <input type="hidden" id="edit-closed-id">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Ticker / Símbolo Acción *</label>
+            <input type="text" id="edit-closed-symbol" class="form-input" style="text-transform: uppercase; font-weight: bold; color: #38bdf8;" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nombre Empresa (Opcional)</label>
+            <input type="text" id="edit-closed-name" class="form-input">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Fecha de Compra *</label>
+            <input type="date" id="edit-closed-buy-date" class="form-input" required onchange="app.calcEditClosedPreview()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Precio Compra US$ *</label>
+            <input type="number" step="any" id="edit-closed-buy-price" class="form-input" required oninput="app.calcEditClosedPreview()">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Fecha de Venta *</label>
+            <input type="date" id="edit-closed-sell-date" class="form-input" required onchange="app.calcEditClosedPreview()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Precio Venta US$ *</label>
+            <input type="number" step="any" id="edit-closed-sell-price" class="form-input" required oninput="app.calcEditClosedPreview()">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Cantidad de Acciones *</label>
+            <input type="number" step="any" id="edit-closed-qty" class="form-input" required oninput="app.calcEditClosedPreview()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notas / Observaciones</label>
+            <input type="text" id="edit-closed-notes" class="form-input">
+          </div>
+        </div>
+
+        <!-- Vista Previa de Cálculos de Edición -->
+        <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; margin: 16px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;">
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">Total Invertido</div>
+            <div id="edit-closed-prev-buy-total" style="font-size: 14px; font-weight: 700; color: #fff;">$0.00</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">Total Recuperado</div>
+            <div id="edit-closed-prev-sell-total" style="font-size: 14px; font-weight: 700; color: #fff;">$0.00</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">Ganancia / Pérdida</div>
+            <div id="edit-closed-prev-gain" style="font-size: 14px; font-weight: 800; color: #10b981;">+$0.00</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">Retorno %</div>
+            <div id="edit-closed-prev-return" style="font-size: 14px; font-weight: 800; color: #10b981;">+0.00%</div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeEditClosedModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Actualizar Registro</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=2.1.0"></script>
+  <script src="/js/app.js?v=2.2.0"></script>
 </body>
 </html>

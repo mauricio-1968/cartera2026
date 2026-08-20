@@ -442,13 +442,166 @@ app.post('/api/transactions/edit', authenticateToken, (req, res) => {
   });
 });
 
-// 6. Eliminar una transacción
+// 5b. Registrar una Venta Histórica directamente (o Reingreso de Registro)
+app.post('/api/transactions/historical', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  let { symbol, original_name, buy_date, quantity, buy_price, sell_date, sell_price, notes } = req.body;
+
+  if (!symbol || !quantity || !buy_price || !sell_price) {
+    return res.status(400).json({ error: 'Ticker, cantidad, precio de compra y precio de venta son requeridos.' });
+  }
+
+  const cleanSymbol = symbol.trim().toUpperCase();
+  const numQty = parseFloat(String(quantity).replace(',', '.'));
+  const numBuyPrice = parseFloat(String(buy_price).replace(',', '.'));
+  const numSellPrice = parseFloat(String(sell_price).replace(',', '.'));
+
+  if (isNaN(numQty) || numQty <= 0 || isNaN(numBuyPrice) || numBuyPrice <= 0 || isNaN(numSellPrice) || numSellPrice <= 0) {
+    return res.status(400).json({ error: 'Por favor ingresa valores numéricos válidos mayores a 0.' });
+  }
+
+  const bDate = buy_date || new Date().toISOString().split('T')[0];
+  const sDate = sell_date || new Date().toISOString().split('T')[0];
+  const buyTotal = Number((numQty * numBuyPrice).toFixed(2));
+  const sellTotal = Number((numQty * numSellPrice).toFixed(2));
+  const realizedGain = Number((sellTotal - buyTotal).toFixed(2));
+  const returnPercent = buyTotal > 0 ? Number(((realizedGain / buyTotal) * 100).toFixed(2)) : 0;
+
+  let daysHeld = 1;
+  try {
+    const diffTime = Math.abs(new Date(sDate) - new Date(bDate));
+    daysHeld = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+  } catch (e) {
+    daysHeld = 1;
+  }
+
+  const sql = `
+    INSERT INTO transactions (
+      user_id, symbol, original_name, type, buy_date, quantity, buy_price, buy_total, stop_loss, status, sell_date, sell_quantity, sell_price, sell_total, realized_gain, days_held, return_percent, notes
+    ) VALUES (?, ?, ?, 'BUY', ?, ?, ?, ?, NULL, 'closed', ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  db.run(
+    sql,
+    [
+      userId,
+      cleanSymbol,
+      original_name || cleanSymbol,
+      bDate,
+      numQty,
+      numBuyPrice,
+      buyTotal,
+      sDate,
+      numQty,
+      numSellPrice,
+      sellTotal,
+      realizedGain,
+      daysHeld,
+      returnPercent,
+      notes || ''
+    ],
+    function(err) {
+      if (err) return res.status(500).json({ error: 'Error al registrar venta histórica: ' + err.message });
+      res.json({
+        message: `Venta histórica de ${cleanSymbol} registrada con éxito. Ganancia: ${realizedGain >= 0 ? '+' : ''}$${realizedGain} (${returnPercent}%)`,
+        id: this ? this.lastID : 1
+      });
+    }
+  );
+});
+
+// 5c. Editar una Venta Histórica existente (Cerrada)
+app.post('/api/transactions/edit-closed', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  let { id, symbol, original_name, buy_date, quantity, buy_price, sell_date, sell_price, notes } = req.body;
+
+  if (!id || !symbol || !quantity || !buy_price || !sell_price) {
+    return res.status(400).json({ error: 'ID, Ticker, cantidad, precio de compra y precio de venta son requeridos.' });
+  }
+
+  const targetId = parseInt(id);
+  const cleanSymbol = symbol.trim().toUpperCase();
+  const numQty = parseFloat(String(quantity).replace(',', '.'));
+  const numBuyPrice = parseFloat(String(buy_price).replace(',', '.'));
+  const numSellPrice = parseFloat(String(sell_price).replace(',', '.'));
+
+  if (isNaN(numQty) || numQty <= 0 || isNaN(numBuyPrice) || numBuyPrice <= 0 || isNaN(numSellPrice) || numSellPrice <= 0) {
+    return res.status(400).json({ error: 'Por favor ingresa valores numéricos válidos mayores a 0.' });
+  }
+
+  const bDate = buy_date || new Date().toISOString().split('T')[0];
+  const sDate = sell_date || new Date().toISOString().split('T')[0];
+  const buyTotal = Number((numQty * numBuyPrice).toFixed(2));
+  const sellTotal = Number((numQty * numSellPrice).toFixed(2));
+  const realizedGain = Number((sellTotal - buyTotal).toFixed(2));
+  const returnPercent = buyTotal > 0 ? Number(((realizedGain / buyTotal) * 100).toFixed(2)) : 0;
+
+  let daysHeld = 1;
+  try {
+    const diffTime = Math.abs(new Date(sDate) - new Date(bDate));
+    daysHeld = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+  } catch (e) {
+    daysHeld = 1;
+  }
+
+  const sql = `
+    UPDATE transactions SET
+      symbol = ?,
+      original_name = ?,
+      buy_date = ?,
+      quantity = ?,
+      buy_price = ?,
+      buy_total = ?,
+      sell_date = ?,
+      sell_quantity = ?,
+      sell_price = ?,
+      sell_total = ?,
+      realized_gain = ?,
+      days_held = ?,
+      return_percent = ?,
+      notes = ?
+    WHERE id = ? AND user_id = ?
+  `;
+
+  db.run(
+    sql,
+    [
+      cleanSymbol,
+      original_name || cleanSymbol,
+      bDate,
+      numQty,
+      numBuyPrice,
+      buyTotal,
+      sDate,
+      numQty,
+      numSellPrice,
+      sellTotal,
+      realizedGain,
+      daysHeld,
+      returnPercent,
+      notes || '',
+      targetId,
+      userId
+    ],
+    function(err) {
+      if (err) return res.status(500).json({ error: 'Error al actualizar venta histórica: ' + err.message });
+      res.json({
+        message: `Venta histórica de ${cleanSymbol} (#${targetId}) actualizada con éxito.`,
+        id: targetId,
+        realizedGain,
+        returnPercent
+      });
+    }
+  );
+});
+
+// 6. Eliminar una transacción (abierta o cerrada)
 app.delete('/api/transactions/:id', authenticateToken, (req, res) => {
   const userId = req.user.id;
   const targetId = parseInt(req.params.id);
   db.run('DELETE FROM transactions WHERE id = ? AND user_id = ?', [targetId, userId], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: 'Registro eliminado', id: targetId });
+    res.json({ message: 'Registro eliminado con éxito de la base de datos', id: targetId });
   });
 });
 
