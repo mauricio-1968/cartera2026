@@ -48,6 +48,10 @@
           <span id="theme-icon">☀️</span> <span id="theme-text">Modo Claro</span>
         </button>
 
+        <button class="btn btn-secondary" onclick="app.openTickerAnalysisModal()" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8; font-weight: 700;">
+          🔍 Analizar Ticker
+        </button>
+
         <button class="btn btn-secondary" onclick="app.refreshData()">
           <span id="refresh-spinner">🔄</span> Actualizar Precios
         </button>
@@ -232,12 +236,27 @@
     <!-- TAB 2: POSICIONES ABIERTAS -->
     <section id="tab-open" style="display: none;">
       <div class="card" style="margin-bottom: 20px;">
-        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
           <span>🟢 Posiciones Activas en Cartera (Cotizaciones en Tiempo Real)</span>
           <button class="btn btn-success" onclick="app.openSellModalFromHeader()" style="padding: 6px 14px; font-size: 13px;">
             💵 Vender una Acción
           </button>
         </div>
+
+        <!-- Barra de Filtro de Ticker en Posiciones Abiertas -->
+        <div style="display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; background: rgba(0,0,0,0.25); padding: 10px 16px; border-radius: 10px; border: 1px solid var(--border-color);">
+          <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px;">
+            <label style="font-size: 13px; font-weight: 600; color: var(--text-muted); white-space: nowrap;">🔍 Filtrar Ticker:</label>
+            <input type="text" id="filter-open-input" class="form-input" placeholder="Escribe Ticker (ej. NVDA, TSLA)..." style="padding: 6px 12px; font-size: 13px; text-transform: uppercase; font-weight: bold; width: 100%;" oninput="app.onFilterOpenChange()">
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <select id="filter-open-select" class="form-input" style="padding: 6px 12px; font-size: 13px; font-weight: 600; width: auto;" onchange="app.onFilterOpenSelect(this.value)">
+              <option value="">-- Todas las Posiciones --</option>
+            </select>
+            <button class="btn btn-secondary" onclick="app.clearOpenFilter()" style="padding: 6px 12px; font-size: 12px;">✕ Limpiar</button>
+          </div>
+        </div>
+
         <div class="table-responsive">
           <table class="data-table">
             <thead>
@@ -273,6 +292,36 @@
             ➕ Registrar Venta Histórica / Reingresar Registro
           </button>
         </div>
+
+        <!-- Barra de Filtro de Ticker en Historial Cerrado -->
+        <div style="display: flex; gap: 12px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; background: rgba(0,0,0,0.25); padding: 10px 16px; border-radius: 10px; border: 1px solid var(--border-color);">
+          <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px;">
+            <label style="font-size: 13px; font-weight: 600; color: var(--text-muted); white-space: nowrap;">🔍 Filtrar Historial:</label>
+            <input type="text" id="filter-closed-input" class="form-input" placeholder="Escribe Ticker (ej. AMD, MU, CUE)..." style="padding: 6px 12px; font-size: 13px; text-transform: uppercase; font-weight: bold; width: 100%;" oninput="app.onFilterClosedChange()">
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <select id="filter-closed-select" class="form-input" style="padding: 6px 12px; font-size: 13px; font-weight: 600; width: auto;" onchange="app.onFilterClosedSelect(this.value)">
+              <option value="">-- Todos los Tickers --</option>
+            </select>
+            <button class="btn btn-secondary" onclick="app.clearClosedFilter()" style="padding: 6px 12px; font-size: 12px;">✕ Limpiar</button>
+          </div>
+        </div>
+
+        <!-- Mini-Banner de Resumen para el Ticker Filtrado -->
+        <div id="filter-closed-summary-banner" style="display: none; margin-bottom: 16px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); padding: 12px 18px; border-radius: 10px; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <span style="font-size: 13px; color: var(--text-muted);">Resumen Histórico para <strong id="filter-summary-ticker" style="color: #38bdf8; font-size: 15px;"></strong>:</span>
+          </div>
+          <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 13px;">
+            <span>Ventas: <strong id="filter-summary-count" style="color: #fff;">0</strong></span>
+            <span>Invertido: <strong id="filter-summary-invested" style="color: #fff;">$0</strong></span>
+            <span>Ganancia Total: <strong id="filter-summary-gain" style="font-weight: 800; color: #10b981;">+$0.00</strong></span>
+            <span>Retorno: <strong id="filter-summary-return" style="font-weight: 800; color: #10b981;">+0.0%</strong></span>
+            <span>Win Rate: <strong id="filter-summary-winrate" style="color: #10b981;">100%</strong></span>
+            <button class="btn btn-primary" id="btn-deep-analyze-filtered" style="padding: 4px 10px; font-size: 11px;">📊 Analizar Ticker</button>
+          </div>
+        </div>
+
         <div class="table-responsive">
           <table class="data-table">
             <thead>
@@ -841,7 +890,171 @@
     </div>
   </div>
 
+  <!-- MODAL: ANÁLISIS PROFUNDO DE TICKER ESPECÍFICO 360° -->
+  <div class="modal-backdrop" id="modal-ticker-analysis">
+    <div class="modal-box" style="max-width: 860px; max-height: 90vh; overflow-y: auto;">
+      <!-- Header con Selector / Buscador Rápido de Ticker -->
+      <div class="modal-header" style="flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 250px;">
+          <span style="font-size: 20px;">🔍</span>
+          <div style="flex: 1;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Analizador 360° de Ticker</div>
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+              <input type="text" id="t-analyzer-input" class="form-input" placeholder="Escribe Ticker (ej. AMD, NVDA, TSLA)..." style="padding: 6px 12px; font-size: 14px; font-weight: 800; text-transform: uppercase; color: #38bdf8; width: 180px;" onkeydown="if(event.key==='Enter') app.runTickerAnalysis(this.value)">
+              <button class="btn btn-primary" style="padding: 6px 14px; font-size: 13px;" onclick="app.runTickerAnalysis(document.getElementById('t-analyzer-input').value)">Analizar</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <select id="t-analyzer-select" class="form-input" style="padding: 6px 12px; font-size: 13px; font-weight: 600; width: auto;" onchange="if(this.value) app.runTickerAnalysis(this.value)">
+            <option value="">-- Seleccionar de tu Cartera --</option>
+          </select>
+          <button class="modal-close" onclick="app.closeTickerAnalysisModal()">✕</button>
+        </div>
+      </div>
+
+      <!-- Spinner de Carga -->
+      <div id="t-analyzer-loading" style="display: none; text-align: center; padding: 40px;">
+        <div style="font-size: 28px; animation: spin 1s linear infinite; display: inline-block;">🔄</div>
+        <div style="font-size: 14px; color: var(--text-muted); margin-top: 10px;">Consultando cotización en vivo, indicadores técnicos y tu historial personal...</div>
+      </div>
+
+      <!-- Contenido del Análisis -->
+      <div id="t-analyzer-content" style="padding-top: 16px;">
+        <!-- Hero del Ticker -->
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <div id="t-hero-avatar" style="width: 52px; height: 52px; border-radius: 12px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-weight: 800; font-size: 18px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(56, 189, 248, 0.3);">
+              AMD
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <h2 id="t-hero-symbol" style="margin: 0; font-size: 22px; font-weight: 800; color: #fff;">AMD</h2>
+                <span id="t-hero-signal-badge" class="badge-up" style="font-size: 12px; padding: 4px 10px; font-weight: bold;">🟢 COMPRA TÁCTICA</span>
+              </div>
+              <div id="t-hero-name" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Advanced Micro Devices, Inc.</div>
+            </div>
+          </div>
+
+          <div style="text-align: right;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Precio en Tiempo Real</div>
+            <div id="t-hero-price" style="font-size: 26px; font-weight: 800; color: #fff;">$0.00</div>
+            <div id="t-hero-change" style="font-size: 13px; font-weight: 700; color: #10b981;">+$0.00 (+0.00%)</div>
+          </div>
+        </div>
+
+        <!-- Grid 2 Columnas: Tu Balance Personal vs Indicadores Técnicos -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; margin-bottom: 20px;">
+          
+          <!-- Card: Tu Balance & Historial Personal en este Ticker -->
+          <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px;">
+            <div style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+              <span>💼 Tu Balance Personal en este Ticker</span>
+            </div>
+
+            <!-- Estado de Posición Abierta -->
+            <div id="t-open-container" style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 12px; font-weight: 700; color: #10b981;">🟢 Posición Abierta Activa</span>
+                <span id="t-open-qty" style="font-size: 12px; color: var(--text-muted);">0.00 acciones</span>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; font-size: 12px;">
+                <div>Precio Compra: <strong id="t-open-buy-price" style="color: #fff;">$0.00</strong></div>
+                <div>Valor Presente: <strong id="t-open-curr-val" style="color: #fff;">$0.00</strong></div>
+                <div style="grid-column: span 2;">
+                  Ganancia Flotante: <strong id="t-open-gain" style="font-weight: 800; color: #10b981;">+$0.00 (+0.0%)</strong>
+                </div>
+              </div>
+            </div>
+            <div id="t-no-open-container" style="display: none; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; margin-bottom: 14px; font-size: 12px; color: var(--text-muted); text-align: center;">
+              No tienes posición abierta activa en este ticker actualmente.
+            </div>
+
+            <!-- Resumen Histórico Cerrado -->
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">
+              Historial de Ventas Realizadas
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin-bottom: 12px;">
+              <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px;">
+                <div style="font-size: 10px; color: var(--text-muted);">Ventas</div>
+                <div id="t-hist-count" style="font-size: 14px; font-weight: 700; color: #fff;">0</div>
+              </div>
+              <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px;">
+                <div style="font-size: 10px; color: var(--text-muted);">Ganancia Realizada</div>
+                <div id="t-hist-gain" style="font-size: 14px; font-weight: 800; color: #10b981;">+$0.00</div>
+              </div>
+              <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px;">
+                <div style="font-size: 10px; color: var(--text-muted);">Win Rate</div>
+                <div id="t-hist-winrate" style="font-size: 14px; font-weight: 800; color: #10b981;">100%</div>
+              </div>
+            </div>
+
+            <!-- Lista Compacta de Ventas -->
+            <div id="t-hist-trades-list" style="max-height: 140px; overflow-y: auto; font-size: 11px;">
+              <!-- Renderizado dinámico -->
+            </div>
+          </div>
+
+          <!-- Card: Indicadores Técnicos & Decisión Táctica -->
+          <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px;">
+            <div style="font-size: 12px; font-weight: 700; color: #a855f7; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+              <span>🎯 Indicadores Cuantitativos & Algoritmo</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px;">
+              <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-muted);">RSI (14d)</div>
+                <div id="t-tech-rsi" style="font-size: 18px; font-weight: 800; color: #60a5fa; margin-top: 2px;">50.0</div>
+                <div id="t-tech-rsi-status" style="font-size: 10px; color: var(--text-muted);">Neutral</div>
+              </div>
+              <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-muted);">Media SMA 50d</div>
+                <div id="t-tech-sma50" style="font-size: 18px; font-weight: 800; color: #38bdf8; margin-top: 2px;">$0.00</div>
+                <div style="font-size: 10px; color: var(--text-muted);">Corto Plazo</div>
+              </div>
+              <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-muted);">Soporte Clave</div>
+                <div id="t-tech-support" style="font-size: 18px; font-weight: 800; color: #10b981; margin-top: 2px;">$0.00</div>
+                <div style="font-size: 10px; color: var(--text-muted);">Piso Técnico</div>
+              </div>
+              <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-muted);">Resistencia Clave</div>
+                <div id="t-tech-resistance" style="font-size: 18px; font-weight: 800; color: #ef4444; margin-top: 2px;">$0.00</div>
+                <div style="font-size: 10px; color: var(--text-muted);">Techo Técnico</div>
+              </div>
+            </div>
+
+            <div style="background: rgba(0,0,0,0.3); border-left: 3px solid var(--primary); padding: 12px; border-radius: 6px;">
+              <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Razonamiento Táctico</div>
+              <p id="t-tech-reason" style="font-size: 12px; color: var(--text-main); margin: 0; line-height: 1.5;"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Noticias Recientes del Ticker -->
+        <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+          <div style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+            <span>📰 Cobertura Financiera & Sentimiento Reciente</span>
+          </div>
+          <div id="t-news-container" style="display: flex; flex-direction: column; gap: 10px;">
+            <!-- Noticias dinámicas -->
+          </div>
+        </div>
+
+        <!-- Botones de Acción Rápida -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-primary" id="t-btn-buy" onclick="app.quickBuyCurrentTicker()">➕ Comprar Acción</button>
+            <button class="btn btn-success" id="t-btn-sell" onclick="app.quickSellCurrentTicker()">💵 Vender Posición</button>
+          </div>
+          <button class="btn btn-secondary" onclick="app.closeTickerAnalysisModal()">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=2.2.0"></script>
+  <script src="/js/app.js?v=2.3.0"></script>
 </body>
 </html>

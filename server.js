@@ -619,6 +619,121 @@ app.get('/api/chart/intraday', async (req, res) => {
   res.json(data);
 });
 
+// 8a. Análisis Profundo de un Ticker Específico (360° Técnico + Cartera Personal)
+app.get('/api/ticker/analyze', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const rawSymbol = req.query.symbol;
+  if (!rawSymbol) {
+    return res.status(400).json({ error: 'Parámetro symbol es requerido' });
+  }
+
+  const symbol = rawSymbol.trim().toUpperCase();
+
+  try {
+    const ta = await getTechnicalAnalysis(symbol);
+    const chartData = await getIntradayChartData(symbol);
+
+    db.all('SELECT * FROM transactions WHERE user_id = ? ORDER BY buy_date DESC, id DESC', [userId], async (err, allRows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      allRows = allRows || [];
+
+      const tickerRows = allRows.filter(r => {
+        const rowSym = (r.symbol || '').trim().toUpperCase();
+        return rowSym === symbol || (symbol === 'GOOGL' && rowSym === 'GOOGLE CA') || (symbol === 'CUE' && rowSym === 'CUE BIO') || (symbol === 'RKLB' && rowSym === 'ROCKET LAB');
+      });
+
+      const openPos = tickerRows.find(r => r.status === 'open');
+      const closedTrades = tickerRows.filter(r => r.status === 'closed');
+
+      let totalInvestedClosed = 0;
+      let totalRecoveredClosed = 0;
+      let totalRealizedGain = 0;
+      let winningTrades = 0;
+
+      closedTrades.forEach(t => {
+        const buyTotal = parseFloat(t.buy_total || 0);
+        const sellTotal = parseFloat(t.sell_total || 0);
+        const gain = parseFloat(t.realized_gain !== undefined && t.realized_gain !== null ? t.realized_gain : (sellTotal - buyTotal));
+        totalInvestedClosed += buyTotal;
+        totalRecoveredClosed += sellTotal;
+        totalRealizedGain += gain;
+        if (gain > 0) winningTrades++;
+      });
+
+      const winRate = closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 0;
+      const closedReturnPercent = totalInvestedClosed > 0 ? (totalRealizedGain / totalInvestedClosed) * 100 : 0;
+
+      let openDetails = null;
+      if (openPos) {
+        const qty = parseFloat(openPos.quantity);
+        const bPrice = parseFloat(openPos.buy_price);
+        const bTotal = parseFloat(openPos.buy_total);
+        const livePrice = ta.currentPrice || bPrice;
+        const curVal = qty * livePrice;
+        const unGain = curVal - bTotal;
+        const unGainPct = bTotal > 0 ? (unGain / bTotal) * 100 : 0;
+
+        openDetails = {
+          id: openPos.id,
+          symbol: openPos.symbol,
+          original_name: openPos.original_name,
+          buy_date: openPos.buy_date,
+          quantity: qty,
+          buy_price: bPrice,
+          buy_total: bTotal,
+          stop_loss: openPos.stop_loss ? parseFloat(openPos.stop_loss) : null,
+          currentPrice: livePrice,
+          currentValue: Number(curVal.toFixed(2)),
+          unrealizedGain: Number(unGain.toFixed(2)),
+          unrealizedGainPercent: Number(unGainPct.toFixed(2)),
+          notes: openPos.notes || ''
+        };
+      }
+
+      let news = [];
+      try {
+        const allNews = await getRealtimeStockNews([symbol]);
+        news = allNews || [];
+      } catch (e) {
+        news = [];
+      }
+
+      res.json({
+        symbol,
+        technical: ta,
+        chart: chartData,
+        portfolio: {
+          hasOpenPosition: !!openDetails,
+          openPosition: openDetails,
+          closedTradesCount: closedTrades.length,
+          totalInvestedClosed: Number(totalInvestedClosed.toFixed(2)),
+          totalRecoveredClosed: Number(totalRecoveredClosed.toFixed(2)),
+          totalRealizedGain: Number(totalRealizedGain.toFixed(2)),
+          closedReturnPercent: Number(closedReturnPercent.toFixed(2)),
+          winRatePercent: Number(winRate.toFixed(1)),
+          winningTradesCount: winningTrades,
+          closedTrades: closedTrades.map(t => ({
+            id: t.id,
+            buy_date: t.buy_date,
+            sell_date: t.sell_date,
+            quantity: parseFloat(t.quantity),
+            buy_price: parseFloat(t.buy_price),
+            buy_total: parseFloat(t.buy_total),
+            sell_price: parseFloat(t.sell_price),
+            sell_total: parseFloat(t.sell_total),
+            realized_gain: parseFloat(t.realized_gain),
+            return_percent: parseFloat(t.return_percent),
+            days_held: parseInt(t.days_held) || 0
+          }))
+        },
+        news
+      });
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Error analizando ticker: ' + err.message });
+  }
+});
+
 // ==========================================
 // ENDPOINTS DE RADAR DE OPORTUNIDADES & ANÁLISIS TÉCNICO (WATCHLIST)
 // ==========================================
