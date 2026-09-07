@@ -10,6 +10,9 @@
   <meta name="theme-color" content="#10b981">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
 
   <!-- Font & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- CSS -->
-  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/styles.css?v=2.4.0">
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -35,6 +38,12 @@
         </div>
       </div>
       <div class="header-actions">
+        <!-- Indicador de Estado de Mercado y Actualización en Vivo -->
+        <div id="live-update-status" style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.04); padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <span id="market-status-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
+          <span id="market-status-text">Actualizando...</span>
+        </div>
+
         <!-- ÁREA DE USUARIO Y LOGIN -->
         <div id="user-profile-bar" style="display: flex; align-items: center; gap: 12px;">
           <span style="font-size: 13px; font-weight: 600; color: #60a5fa;">👤 <span id="current-user-name">Mauricio Martinez</span></span>
@@ -1055,6 +1064,6 @@
   </div>
 
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=2.3.0"></script>
+  <script src="/js/app.js?v=2.4.0"></script>
 </body>
 </html>

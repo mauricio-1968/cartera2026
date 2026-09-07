@@ -21,7 +21,27 @@ const JWT_SECRET = process.env.JWT_SECRET || 'cartera_secret_key_2026';
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+
+// Middleware Anti-Caché para todos los endpoints de API
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  next();
+});
+
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+    }
+  }
+}));
 
 // Inicializar la base de datos (PostgreSQL Cloud o SQLite Local)
 initDb();
@@ -800,6 +820,20 @@ app.delete('/api/watchlist/:symbol', authenticateToken, (req, res) => {
   db.run('DELETE FROM watchlist WHERE user_id = ? AND UPPER(symbol) = ?', [userId, cleanSymbol], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ message: `Empresa ${cleanSymbol} eliminada del radar.`, symbol: cleanSymbol });
+  });
+});
+
+// 8e. Endpoint directo de Noticias del Portafolio
+app.get('/api/news', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  db.all('SELECT DISTINCT symbol FROM transactions WHERE user_id = ? AND status = ?', [userId, 'open'], async (err, rows) => {
+    const symbols = (rows && rows.length > 0) ? rows.map(r => r.symbol) : ['TSLA', 'NVDA', 'AAPL', 'AMZN', 'MSFT', 'META'];
+    try {
+      const news = await getPortfolioNews(symbols);
+      res.json({ news });
+    } catch (e) {
+      res.json({ news: [] });
+    }
   });
 });
 

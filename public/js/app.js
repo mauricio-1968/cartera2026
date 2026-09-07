@@ -150,7 +150,7 @@ const app = {
     }
 
     try {
-      const res = await fetch('/api/portfolio/summary', {
+      const res = await fetch(`/api/portfolio/summary?_t=${Date.now()}`, {
         headers: this.getAuthHeaders()
       });
       if (!res.ok) {
@@ -171,6 +171,7 @@ const app = {
       this.renderClosedTable(data.closedPositions);
       this.populateTickerFilters();
       this.fetchWatchlist();
+      this.updateMarketStatusBadge();
 
     } catch (err) {
       console.error('Error cargando portafolio:', err);
@@ -179,6 +180,36 @@ const app = {
         const spinner = document.getElementById('refresh-spinner');
         if (spinner) spinner.classList.remove('spin');
       }
+    }
+  },
+
+  updateMarketStatusBadge() {
+    const dot = document.getElementById('market-status-dot');
+    const text = document.getElementById('market-status-text');
+    if (!dot || !text) return;
+
+    const now = new Date();
+    const nyTimeString = now.toLocaleString('en-US', { timeZone: 'America/New_York' });
+    const nyDate = new Date(nyTimeString);
+    const day = nyDate.getDay();
+    const hour = nyDate.getHours();
+    const min = nyDate.getMinutes();
+    const totalMins = hour * 60 + min;
+
+    const isWeekend = (day === 0 || day === 6);
+    const isTradingHours = (totalMins >= (9 * 60 + 30) && totalMins < (16 * 60));
+    const isMarketOpen = !isWeekend && isTradingHours;
+
+    const timeFormatted = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    if (isMarketOpen) {
+      dot.style.background = '#10b981';
+      dot.style.boxShadow = '0 0 6px #10b981';
+      text.innerHTML = `🟢 Mercado Abierto • <span style="color: #fff;">${timeFormatted}</span>`;
+    } else {
+      dot.style.background = '#ef4444';
+      dot.style.boxShadow = '0 0 6px #ef4444';
+      text.innerHTML = `🔴 Mercado Cerrado • <span style="color: #fff;">${timeFormatted}</span>`;
     }
   },
 
@@ -446,7 +477,7 @@ const app = {
     const ctx = canvas.getContext('2d');
 
     try {
-      const res = await fetch(`/api/chart/intraday?symbol=${encodeURIComponent(symbol)}`);
+      const res = await fetch(`/api/chart/intraday?symbol=${encodeURIComponent(symbol)}&_t=${Date.now()}`);
       if (!res.ok) throw new Error('Error al obtener datos intradiarios');
       const data = await res.json();
 
@@ -652,7 +683,7 @@ const app = {
     const ctx = canvas.getContext('2d');
 
     try {
-      const res = await fetch('/api/chart/historical-portfolio', {
+      const res = await fetch(`/api/chart/historical-portfolio?_t=${Date.now()}`, {
         headers: this.getAuthHeaders()
       });
       if (!res.ok) throw new Error('Error al obtener datos históricos');
@@ -1060,7 +1091,7 @@ const app = {
     contentElem.style.display = 'none';
 
     try {
-      const res = await fetch(`/api/ticker/analyze?symbol=${encodeURIComponent(cleanSymbol)}`, {
+      const res = await fetch(`/api/ticker/analyze?symbol=${encodeURIComponent(cleanSymbol)}&_t=${Date.now()}`, {
         headers: this.getAuthHeaders()
       });
       const data = await res.json();
@@ -1553,7 +1584,7 @@ const app = {
 
   async fetchWatchlist() {
     try {
-      const res = await fetch('/api/watchlist', {
+      const res = await fetch(`/api/watchlist?_t=${Date.now()}`, {
         headers: this.getAuthHeaders()
       });
       if (!res.ok) return;
