@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portrack | Galería de Nuevas Propuestas de Diseño</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --success: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Outfit', sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 30px 20px; line-height: 1.5; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header { text-align: center; margin-bottom: 40px; }
+    .header h1 { font-size: 32px; font-weight: 800; color: #fff; margin-bottom: 8px; }
+    .header p { font-size: 16px; color: var(--text-muted); }
+    .proposals-grid { display: flex; flex-direction: column; gap: 40px; }
+    .proposal-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+    .proposal-header { padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 10px; }
+    .proposal-title { font-size: 20px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 10px; }
+    .badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+    .badge-slate { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .badge-navy { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+    .badge-bento { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .proposal-body { padding: 20px; }
+    .img-wrapper { width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: #000; margin-bottom: 16px; }
+    .img-wrapper img { width: 100%; height: auto; display: block; transition: transform 0.3s ease; }
+    .img-wrapper img:hover { transform: scale(1.01); }
+    .features-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 16px; }
+    .feature-item { background: rgba(255,255,255,0.03); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05); }
+    .feature-item strong { color: #fff; display: block; margin-bottom: 4px; font-size: 14px; }
+    .feature-item p { font-size: 13px; color: var(--text-muted); margin: 0; }
+    .btn-back { display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; border: 1px solid var(--border); margin-bottom: 24px; }
+    .btn-back:hover { background: rgba(255,255,255,0.1); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" class="btn-back">← Volver a Portrack Cartera</a>
+
+    <div class="header">
+      <h1>🎨 Galería de Nuevas Propuestas de Diseño</h1>
+      <p>3 alternativas visuales modernas enfocadas en destacar la <strong>Ganancia Flotante</strong> y tus <strong>Posiciones Abiertas</strong> con tonos claros y semi-oscuros.</p>
+    </div>
+
+    <div class="proposals-grid">
+      
+      <!-- PROPUESTA 1 -->
+      <div class="proposal-card">
+        <div class="proposal-header">
+          <div class="proposal-title">
+            <span>🌟 Propuesta 1: Fintech Slate & Emerald</span>
+            <span class="badge badge-slate">Estilo Stripe / Robinhood</span>
+          </div>
+        </div>
+        <div class="proposal-body">
+          <div class="img-wrapper">
+            <img src="/img/proposals/propuesta_slate.jpg" alt="Propuesta 1: Fintech Slate & Emerald">
+          </div>
+          <div class="features-list">
+            <div class="feature-item">
+              <strong>📈 Hero Card de Ganancia Flotante</strong>
+              <p>Muestra tu ganancia no realizada en tipografía gigante con gráfico de área verde esmeralda y resumen del día.</p>
+            </div>
+            <div class="feature-item">
+              <strong>🗂️ Tarjetas Individuales de Posiciones</strong>
+              <p>Cada acción abierta (AVGO, TSLA, APPS, MRVL) tiene su propia tarjeta con precio de compra, precio en vivo y botones de trading rápido.</p>
+            </div>
+            <div class="feature-item">
+              <strong>☀️ Fondo Claro Suave (No Cansa la Vista)</strong>
+              <p>Fondo platino/slate suave (#f8fafc) con tarjetas blancas nítidas, ideal para lectura diurna y en tablets.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROPUESTA 2 -->
+      <div class="proposal-card">
+        <div class="proposal-header">
+          <div class="proposal-title">
+            <span>💎 Propuesta 2: Steel Navy & Frosted Glass</span>
+            <span class="badge badge-navy">Estilo Bloomberg Neo</span>
+          </div>
+        </div>
+        <div class="proposal-body">
+          <div class="img-wrapper">
+            <img src="/img/proposals/propuesta_steel_navy.jpg" alt="Propuesta 2: Steel Navy & Frosted Glass">
+          </div>
+          <div class="features-list">
+            <div class="feature-item">
+              <strong>✨ Insignia Glassmorphism Iluminada</strong>
+              <p>Tu ganancia flotante destaca en una tarjeta translúcida de vidrio esmerilado con brillo suave verde menta.</p>
+            </div>
+            <div class="feature-item">
+              <strong>📊 Matriz Táctica de Posiciones</strong>
+              <p>Visualización de acciones en columnas con barras de rendimiento en tiempo real y señales algorítmicas (Hold / Profit Taking).</p>
+            </div>
+            <div class="feature-item">
+              <strong>🌌 Tono Azul Acero Profesional</strong>
+              <p>Fondo suave grafito y azul acero (#1e293b a #334155), sin la oscuridad profunda del negro total.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROPUESTA 3 -->
+      <div class="proposal-card">
+        <div class="proposal-header">
+          <div class="proposal-title">
+            <span>🍏 Propuesta 3: Clean Bento Nordic</span>
+            <span class="badge badge-bento">Estilo Apple Finance / Revolut</span>
+          </div>
+        </div>
+        <div class="proposal-body">
+          <div class="img-wrapper">
+            <img src="/img/proposals/propuesta_bento_nordic.jpg" alt="Propuesta 3: Clean Bento Nordic">
+          </div>
+          <div class="features-list">
+            <div class="feature-item">
+              <strong>🍱 Bloque Bento 2x2 Dominante</strong>
+              <p>Módulo de alto impacto dedicado exclusivamente a la Ganancia Flotante y al Valor Total de Cartera.</p>
+            </div>
+            <div class="feature-item">
+              <strong>🧩 Cuadrícula Modular de Acciones</strong>
+              <p>Bloques compactos, elegantes y limpios con precio de entrada, precio actual, ganancia en $ y % y botones en 1 clic.</p>
+            </div>
+            <div class="feature-item">
+              <strong>🌿 Minimalismo Nórdico Claro</strong>
+              <p>Fondo gris perla suave (#f4f4f5) con tipografía oscura de máximo contraste y acentos verde menta.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>
