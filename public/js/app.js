@@ -164,6 +164,7 @@ const app = {
       this.data = data;
 
       this.renderSummary(data.summary);
+      this.renderOpenPositionsCards(data.openPositions);
       this.renderVerticalTickerList(data.openPositions);
       this.renderCharts(data.openPositions);
       this.renderNews(data.news);
@@ -203,13 +204,13 @@ const app = {
     const timeFormatted = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
     if (isMarketOpen) {
-      dot.style.background = '#10b981';
-      dot.style.boxShadow = '0 0 6px #10b981';
-      text.innerHTML = `🟢 Mercado Abierto • <span style="color: #fff;">${timeFormatted}</span>`;
+      dot.style.background = '#059669';
+      dot.style.boxShadow = '0 0 6px #059669';
+      text.innerHTML = `🟢 Mercado Abierto • <span style="font-weight: 700;">${timeFormatted}</span>`;
     } else {
-      dot.style.background = '#ef4444';
-      dot.style.boxShadow = '0 0 6px #ef4444';
-      text.innerHTML = `🔴 Mercado Cerrado • <span style="color: #fff;">${timeFormatted}</span>`;
+      dot.style.background = '#dc2626';
+      dot.style.boxShadow = '0 0 6px #dc2626';
+      text.innerHTML = `🔴 Mercado Cerrado • <span style="font-weight: 700;">${timeFormatted}</span>`;
     }
   },
 
@@ -218,26 +219,103 @@ const app = {
   },
 
   renderSummary(s) {
-    document.getElementById('stat-total-val').innerText = `$${s.totalPortfolioValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    document.getElementById('stat-total-sub').innerHTML = `Capital Abierto: <strong>$${s.totalOpenInvested.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>`;
+    const heroFloatingVal = document.getElementById('hero-floating-val');
+    const heroTotal = document.getElementById('hero-total-portfolio');
+    const heroOpenInv = document.getElementById('hero-open-invested');
+    const heroDaily = document.getElementById('hero-daily-change');
+    const heroClosed = document.getElementById('hero-closed-realized');
+    const heroWinrate = document.getElementById('hero-winrate');
+    const heroCount = document.getElementById('hero-open-count');
 
-    const unrealizedElem = document.getElementById('stat-unrealized');
-    const unrealizedSub = document.getElementById('stat-unrealized-sub');
-    const uGain = s.unrealizedGain;
-    const uPercent = s.unrealizedGainPercent;
+    const uGain = s.unrealizedGain || 0;
+    const uPct = s.unrealizedGainPercent || 0;
+    const isPos = uGain >= 0;
 
-    unrealizedElem.innerText = `${uGain >= 0 ? '+' : ''}$${uGain.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    unrealizedElem.className = `stat-value ${uGain >= 0 ? 'text-success' : 'text-danger'}`;
-    unrealizedSub.innerHTML = `<span class="${uPercent >= 0 ? 'badge-up' : 'badge-down'}">${uPercent >= 0 ? '+' : ''}${uPercent.toFixed(2)}% Flotante</span> (${s.openPositionsCount} posiciones)`;
+    if (heroFloatingVal) {
+      heroFloatingVal.innerText = `${isPos ? '+' : ''}$${uGain.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${isPos ? '+' : ''}${uPct.toFixed(2)}%)`;
+      heroFloatingVal.className = `hero-value ${isPos ? '' : 'negative'}`;
+    }
+    if (heroTotal) heroTotal.innerText = `$${s.totalPortfolioValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    if (heroOpenInv) heroOpenInv.innerText = `$${s.totalOpenInvested.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    if (heroDaily) {
+      const dSign = (s.totalDailyChangeDollar || 0) >= 0 ? '+' : '';
+      heroDaily.innerText = `${dSign}$${(s.totalDailyChangeDollar || 0).toFixed(2)}`;
+    }
+    if (heroClosed) heroClosed.innerText = `+$${s.totalRealizedGain.toLocaleString('en-US', { minimumFractionDigits: 2 })} (+${s.realizedGainPercent.toFixed(1)}%)`;
+    if (heroWinrate) heroWinrate.innerText = `${s.winRatePercent.toFixed(1)}% (${s.winningTradesCount || 0} de ${s.closedPositionsCount})`;
+    if (heroCount) heroCount.innerText = `${s.openPositionsCount} acciones`;
 
-    document.getElementById('stat-realized').innerText = `+$${s.totalRealizedGain.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    document.getElementById('stat-realized-sub').innerText = `+${s.realizedGainPercent.toFixed(1)}% Retorno acumulado`;
+    const countOpen = document.getElementById('count-open');
+    const countClosed = document.getElementById('count-closed');
+    if (countOpen) countOpen.innerText = s.openPositionsCount;
+    if (countClosed) countClosed.innerText = s.closedPositionsCount;
+  },
 
-    document.getElementById('stat-winrate').innerText = `${s.winRatePercent.toFixed(1)}%`;
-    document.getElementById('stat-winrate-sub').innerText = `${s.closedPositionsCount} ventas registradas`;
+  renderOpenPositionsCards(openPositions) {
+    const grid = document.getElementById('holdings-cards-grid');
+    const badge = document.getElementById('badge-holdings-count');
+    if (badge) badge.innerText = `${openPositions ? openPositions.length : 0} activas`;
+    if (!grid) return;
 
-    document.getElementById('count-open').innerText = s.openPositionsCount;
-    document.getElementById('count-closed').innerText = s.closedPositionsCount;
+    if (!openPositions || openPositions.length === 0) {
+      grid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 30px; background: var(--bg-card); border-radius: 14px; border: 1px solid var(--border-color); color: var(--text-muted);">
+          No tienes posiciones abiertas activas actualmente. Usa el botón <strong>➕ Nueva Compra</strong> para registrar una acción.
+        </div>
+      `;
+      return;
+    }
+
+    let html = '';
+    openPositions.forEach(pos => {
+      const uGain = pos.unrealizedGain || 0;
+      const uPct = pos.unrealizedGainPercent || 0;
+      const isPositive = uGain >= 0;
+      const pillClass = isPositive ? 'pill-up' : 'pill-down';
+      const dayChangeClass = (pos.change || 0) >= 0 ? 'text-success' : 'text-danger';
+      const dayChangeSign = (pos.change || 0) >= 0 ? '+' : '';
+
+      html += `
+        <div class="holding-card" onclick="app.openTickerAnalysisModal('${pos.symbol}')">
+          <div class="holding-card-top">
+            <div class="holding-avatar-info">
+              <div class="holding-avatar">${pos.symbol.substring(0, 3)}</div>
+              <div>
+                <div class="holding-symbol">${pos.symbol}</div>
+                <div class="holding-name">${pos.original_name || pos.symbol}</div>
+              </div>
+            </div>
+            <div class="holding-price-badge">
+              <div class="holding-live-price">$${(pos.livePrice || pos.buy_price).toFixed(2)}</div>
+              <div class="holding-day-change ${dayChangeClass}">${dayChangeSign}${(pos.changePercent || 0).toFixed(2)}% hoy</div>
+            </div>
+          </div>
+
+          <div class="holding-profit-box">
+            <div class="holding-profit-label">Ganancia Flotante</div>
+            <div class="holding-profit-pill ${pillClass}">
+              ${isPositive ? '▲ +' : '▼ '}$${Math.abs(uGain).toFixed(2)} (${isPositive ? '+' : ''}${uPct.toFixed(2)}%)
+            </div>
+          </div>
+
+          <div class="holding-details-row">
+            <span>Compra: <strong>$${parseFloat(pos.buy_price).toFixed(2)}</strong> (${pos.quantity} acc)</span>
+            <span>Total: <strong>$${(pos.currentValue || 0).toFixed(2)}</strong></span>
+          </div>
+
+          <div class="holding-card-actions" onclick="event.stopPropagation()">
+            <button type="button" class="btn-card-action btn-card-buy" onclick="app.quickBuyCurrentTicker('${pos.symbol}', ${pos.livePrice || pos.buy_price})">
+              ➕ Comprar
+            </button>
+            <button type="button" class="btn-card-action btn-card-sell" onclick="app.quickSellCurrentTicker('${pos.symbol}', ${pos.quantity}, ${pos.livePrice || pos.buy_price})">
+              💵 Vender
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    grid.innerHTML = html;
   },
 
   renderVerticalTickerList(openPositions) {
@@ -376,42 +454,42 @@ const app = {
     document.getElementById('modal-news').classList.remove('active');
   },
 
-  theme: 'dark',
+  theme: 'slate',
   showVolume: true,
 
   initTheme() {
-    const savedTheme = localStorage.getItem('theme') || 'dark';
+    const savedTheme = localStorage.getItem('theme') || 'slate';
     this.theme = savedTheme;
-    if (savedTheme === 'light') {
-      document.body.classList.add('light-theme');
+    if (savedTheme === 'dark') {
+      document.body.classList.add('dark-theme');
       this.updateThemeButton(true);
     } else {
-      document.body.classList.remove('light-theme');
+      document.body.classList.remove('dark-theme');
       this.updateThemeButton(false);
     }
   },
 
   toggleTheme() {
-    const isLight = document.body.classList.toggle('light-theme');
-    this.theme = isLight ? 'light' : 'dark';
+    const isDark = document.body.classList.toggle('dark-theme');
+    this.theme = isDark ? 'dark' : 'slate';
     localStorage.setItem('theme', this.theme);
-    this.updateThemeButton(isLight);
+    this.updateThemeButton(isDark);
 
     if (this.data && this.data.openPositions) {
       this.renderCharts(this.data.openPositions);
     }
   },
 
-  updateThemeButton(isLight) {
+  updateThemeButton(isDark) {
     const icon = document.getElementById('theme-icon');
     const text = document.getElementById('theme-text');
     if (icon && text) {
-      if (isLight) {
+      if (isDark) {
+        icon.innerText = '☀️';
+        text.innerText = 'Modo Slate';
+      } else {
         icon.innerText = '🌙';
         text.innerText = 'Modo Oscuro';
-      } else {
-        icon.innerText = '☀️';
-        text.innerText = 'Modo Claro';
       }
     }
   },

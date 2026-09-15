@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=2.4.0">
+  <link rel="stylesheet" href="/css/styles.css?v=2.5.0">
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -87,49 +87,65 @@
 
     <!-- TAB 1: DASHBOARD -->
     <section id="tab-dashboard">
-      <!-- Stat Cards -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-header">
-            <span class="stat-title">Valor Total Cartera</span>
-            <span class="stat-icon">💰</span>
+      <!-- HERO CARD GIGANTE DE GANANCIA FLOTANTE (PROPUESTA 1 - FINTECH SLATE & EMERALD) -->
+      <div class="hero-floating-card">
+        <div class="hero-floating-left">
+          <div class="hero-label">
+            <span class="hero-pulse-dot"></span>
+            <span>Ganancia Flotante No Realizada (Posiciones Abiertas)</span>
           </div>
-          <div class="stat-value" id="stat-total-val">$0.00</div>
-          <div class="stat-sub" id="stat-total-sub">
-            Cargando...
-          </div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-header">
-            <span class="stat-title">Ganancia Flotante (No Realizada)</span>
-            <span class="stat-icon">📈</span>
-          </div>
-          <div class="stat-value" id="stat-unrealized">$0.00</div>
-          <div class="stat-sub" id="stat-unrealized-sub">
-            Posiciones Abiertas
-          </div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-header">
-            <span class="stat-title">Ganancia Realizada (Ventas)</span>
-            <span class="stat-icon">💵</span>
-          </div>
-          <div class="stat-value text-success" id="stat-realized">$0.00</div>
-          <div class="stat-sub text-success" id="stat-realized-sub">
-            +0.0% Retorno Cerrado
+          <div class="hero-value" id="hero-floating-val">+$0.00 (+0.0%)</div>
+          
+          <div class="hero-chips-container">
+            <div class="hero-chip">
+              <span class="hero-chip-label">Valor Portafolio:</span>
+              <strong id="hero-total-portfolio">$0.00</strong>
+            </div>
+            <div class="hero-chip">
+              <span class="hero-chip-label">Capital Abierto:</span>
+              <strong id="hero-open-invested">$0.00</strong>
+            </div>
+            <div class="hero-chip">
+              <span class="hero-chip-label">Variación Hoy:</span>
+              <strong id="hero-daily-change">$0.00</strong>
+            </div>
           </div>
         </div>
 
-        <div class="stat-card">
-          <div class="stat-header">
-            <span class="stat-title">Efectividad (Win Rate)</span>
-            <span class="stat-icon">🏆</span>
+        <div class="hero-floating-right">
+          <div class="hero-metric-row">
+            <span class="hero-metric-title">💵 Ganancias Cerradas (Ventas):</span>
+            <span class="hero-metric-val text-success" id="hero-closed-realized">+$0.00</span>
           </div>
-          <div class="stat-value" id="stat-winrate">0.0%</div>
-          <div class="stat-sub" id="stat-winrate-sub">
-            0 ventas registradas
+          <div class="hero-metric-row">
+            <span class="hero-metric-title">🏆 Efectividad Histórica (Win Rate):</span>
+            <span class="hero-metric-val" id="hero-winrate">0.0%</span>
+          </div>
+          <div class="hero-metric-row">
+            <span class="hero-metric-title">🟢 Posiciones Abiertas Activas:</span>
+            <span class="hero-metric-val" id="hero-open-count" style="color: var(--accent-blue);">0 acciones</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN DEDICADA: DECK DE POSICIONES ABIERTAS ACTIVAS (CARDS INTERACTIVAS) -->
+      <div class="active-holdings-section" style="margin-bottom: 28px;">
+        <div class="section-header-row">
+          <div class="section-title">
+            <span>🟢 Posiciones Abiertas en Cartera</span>
+            <span class="section-badge-count" id="badge-holdings-count">0 activas</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" style="font-size: 12px; padding: 5px 12px;" onclick="app.switchTab('open')">
+              📑 Ver en Tabla Detallada →
+            </button>
+          </div>
+        </div>
+
+        <!-- Grid de Tarjetas de Posiciones Abiertas -->
+        <div class="holdings-cards-grid" id="holdings-cards-grid">
+          <div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: var(--text-muted);">
+            Cargando posiciones abiertas activas...
           </div>
         </div>
       </div>
@@ -1064,6 +1080,6 @@
   </div>
 
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=2.4.0"></script>
+  <script src="/js/app.js?v=2.5.0"></script>
 </body>
 </html>
