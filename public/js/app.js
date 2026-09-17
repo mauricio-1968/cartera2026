@@ -190,28 +190,68 @@ const app = {
     if (!dot || !text) return;
 
     const now = new Date();
-    const nyTimeString = now.toLocaleString('en-US', { timeZone: 'America/New_York' });
-    const nyDate = new Date(nyTimeString);
-    const day = nyDate.getDay();
-    const hour = nyDate.getHours();
-    const min = nyDate.getMinutes();
-    const totalMins = hour * 60 + min;
+    
+    // Obtener componentes de hora oficial de Wall Street (New York / EDT / EST)
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hour12: false,
+      weekday: 'short'
+    });
 
-    const isWeekend = (day === 0 || day === 6);
-    const isTradingHours = (totalMins >= (9 * 60 + 30) && totalMins < (16 * 60));
-    const isMarketOpen = !isWeekend && isTradingHours;
+    const parts = formatter.formatToParts(now);
+    let weekday = '', hour = 0, minute = 0, second = 0;
+    parts.forEach(p => {
+      if (p.type === 'weekday') weekday = p.value;
+      if (p.type === 'hour') hour = parseInt(p.value, 10);
+      if (p.type === 'minute') minute = parseInt(p.value, 10);
+      if (p.type === 'second') second = parseInt(p.value, 10);
+    });
+    if (hour === 24) hour = 0;
 
-    const timeFormatted = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const totalMinutes = hour * 60 + minute;
+    const isWeekend = (weekday === 'Sat' || weekday === 'Sun');
+    const nyTimeFormatted = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} NY`;
+    const localTimeFormatted = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    if (isMarketOpen) {
-      dot.style.background = '#059669';
-      dot.style.boxShadow = '0 0 6px #059669';
-      text.innerHTML = `🟢 Mercado Abierto • <span style="font-weight: 700;">${timeFormatted}</span>`;
-    } else {
+    if (isWeekend) {
       dot.style.background = '#dc2626';
       dot.style.boxShadow = '0 0 6px #dc2626';
-      text.innerHTML = `🔴 Mercado Cerrado • <span style="font-weight: 700;">${timeFormatted}</span>`;
+      text.innerHTML = `🔴 Fin de Semana • <span style="font-weight: 700;">${localTimeFormatted}</span> (${nyTimeFormatted})`;
+      return;
     }
+
+    // 1. Pre-Market (Pre-Apertura): 04:00 AM a 09:30 AM NY
+    if (totalMinutes >= 240 && totalMinutes < 570) {
+      const minsToOpen = 570 - totalMinutes;
+      dot.style.background = '#f59e0b';
+      dot.style.boxShadow = '0 0 6px #f59e0b';
+      text.innerHTML = `🟡 Pre-Market (${nyTimeFormatted}) • Abre en ${minsToOpen} min • <span style="font-weight: 700;">${localTimeFormatted}</span>`;
+      return;
+    }
+
+    // 2. Regular Session (Mercado Abierto Wall Street): 09:30 AM a 16:00 PM NY
+    if (totalMinutes >= 570 && totalMinutes < 960) {
+      dot.style.background = '#059669';
+      dot.style.boxShadow = '0 0 6px #059669';
+      text.innerHTML = `🟢 Mercado Abierto (${nyTimeFormatted}) • <span style="font-weight: 700;">${localTimeFormatted}</span>`;
+      return;
+    }
+
+    // 3. After-Hours (Post-Cierre): 16:00 PM a 20:00 PM NY
+    if (totalMinutes >= 960 && totalMinutes < 1200) {
+      dot.style.background = '#3b82f6';
+      dot.style.boxShadow = '0 0 6px #3b82f6';
+      text.innerHTML = `🔵 After-Hours (${nyTimeFormatted}) • <span style="font-weight: 700;">${localTimeFormatted}</span>`;
+      return;
+    }
+
+    // 4. Mercado Cerrado de Noche
+    dot.style.background = '#dc2626';
+    dot.style.boxShadow = '0 0 6px #dc2626';
+    text.innerHTML = `🔴 Mercado Cerrado (${nyTimeFormatted}) • <span style="font-weight: 700;">${localTimeFormatted}</span>`;
   },
 
   refreshData() {
