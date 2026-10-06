@@ -1,4 +1,4 @@
-﻿/* ==========================================================
+/* ==========================================================
    PORTRACK - FINTECH SLATE & EMERALD THEME (PROPUESTA 1)
    Diseño de Alta Gama: Énfasis en Ganancia Flotante y Posiciones Abiertas
    Optimizado para Monitores PC y Tablets (Touch & Click Friendly)
@@ -635,17 +635,31 @@ body {
   width: 100%;
 }
 
-.dashboard-layout {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 24px;
-  margin-bottom: 28px;
+.hero-value-wrapper {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
 }
 
-@media (max-width: 1024px) {
-  .dashboard-layout {
-    grid-template-columns: 1fr;
-  }
+.hero-floating-pct-badge {
+  font-size: 18px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dashboard-layout,
+.dashboard-full-width {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 28px;
+  width: 100%;
 }
 
 /* ==========================================================

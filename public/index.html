@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=2.5.0">
+  <link rel="stylesheet" href="/css/styles.css?v=2.6.0">
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -94,7 +94,10 @@
             <span class="hero-pulse-dot"></span>
             <span>Ganancia Flotante No Realizada (Posiciones Abiertas)</span>
           </div>
-          <div class="hero-value" id="hero-floating-val">+$0.00 (+0.0%)</div>
+          <div class="hero-value-wrapper" style="display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 4px;">
+            <span class="hero-value" id="hero-floating-val">+$0.00</span>
+            <span class="hero-floating-pct-badge" id="hero-floating-pct" style="font-size: 18px; font-weight: 700; padding: 4px 12px; border-radius: 8px; background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); display: inline-flex; align-items: center; gap: 4px;">+0.00%</span>
+          </div>
           
           <div class="hero-chips-container">
             <div class="hero-chip">
@@ -150,109 +153,93 @@
         </div>
       </div>
 
-      <!-- Dashboard Layout con Ticker Vertical -->
-      <div class="dashboard-layout">
-        <!-- Columna Izquierda: Gráfico Lineal/Velas Intradiario, Gráfico Histórico y Noticias -->
-        <div class="dashboard-left">
-          <!-- CARD 1: GRÁFICO INTRADIARIO (LÍNEA VS VELAS JAPONESAS VS VOLUMEN) -->
-          <div class="card" style="margin-bottom: 24px;">
-            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-              <span>📈 Evolución Intradiaria del Precio y Volumen (Cada 30 min - Hoy)</span>
-              <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                <!-- Selector de Estilo de Gráfico -->
-                <div style="display: flex; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 2px; border: 1px solid var(--border-color);">
-                  <button type="button" id="btn-chart-style-line" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="app.setChartStyle('line')">
-                    📈 Línea
-                  </button>
-                  <button type="button" id="btn-chart-style-candle" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="app.setChartStyle('candle')">
-                    🕯️ Velas Japonesas
-                  </button>
-                  <button type="button" id="btn-chart-volume" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px; margin-left: 4px;" onclick="app.toggleVolume()">
-                    📊 Volumen (<span id="volume-status-text">ON</span>)
-                  </button>
-                </div>
+      <!-- Dashboard Layout de Ancho Completo -->
+      <div class="dashboard-full-width">
+        <!-- CARD 1: GRÁFICO INTRADIARIO (LÍNEA VS VELAS JAPONESAS VS VOLUMEN) -->
+        <div class="card" style="margin-bottom: 24px;">
+          <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <span>📈 Evolución Intradiaria del Precio y Volumen (Cada 30 min - Hoy)</span>
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <!-- Selector de Estilo de Gráfico -->
+              <div style="display: flex; background: rgba(0,0,0,0.06); border-radius: 8px; padding: 2px; border: 1px solid var(--border-color);">
+                <button type="button" id="btn-chart-style-line" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="app.setChartStyle('line')">
+                  📈 Línea
+                </button>
+                <button type="button" id="btn-chart-style-candle" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="app.setChartStyle('candle')">
+                  🕯️ Velas Japonesas
+                </button>
+                <button type="button" id="btn-chart-volume" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px; margin-left: 4px;" onclick="app.toggleVolume()">
+                  📊 Volumen (<span id="volume-status-text">ON</span>)
+                </button>
+              </div>
 
-                <div style="display: flex; align-items: center; gap: 6px;">
-                  <label style="font-size: 12px; color: var(--text-muted);">Acción:</label>
-                  <select id="chart-stock-select" class="form-input" style="padding: 4px 10px; font-size: 13px; width: auto; font-weight: bold;" onchange="app.changeIntradaySymbol(this.value)">
-                    <!-- Opciones dinámicas -->
-                  </select>
-                </div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <label style="font-size: 12px; color: var(--text-muted);">Acción:</label>
+                <select id="chart-stock-select" class="form-input" style="padding: 4px 10px; font-size: 13px; width: auto; font-weight: bold;" onchange="app.changeIntradaySymbol(this.value)">
+                  <!-- Opciones dinámicas -->
+                </select>
               </div>
             </div>
-            <div class="chart-container">
-              <canvas id="chart-intraday-line"></canvas>
-            </div>
           </div>
-
-          <!-- CARD 2: NUEVO GRÁFICO DE EVOLUCIÓN HISTÓRICA (VALOR TOTAL VS TIEMPO) -->
-          <div class="card" style="margin-bottom: 24px;">
-            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
-              <span>📈 Evolución Histórica de la Cartera (Valor Total vs Tiempo)</span>
-              <span style="font-size: 11px; font-weight: normal; color: #10b981;">Ganancia / Pérdida Acumulada Real</span>
-            </div>
-            <div class="chart-container">
-              <canvas id="chart-historical-line"></canvas>
-            </div>
-          </div>
-
-          <!-- CARD: RADAR DE OPORTUNIDADES & ANÁLISIS TÉCNICO DE CORTO PLAZO -->
-          <div class="card" style="margin-bottom: 24px;">
-            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-              <span>🎯 Radar de Oportunidades & Análisis Técnico (Corto Plazo)</span>
-              
-              <!-- Formulario de Agregar Ticker al Radar -->
-              <form onsubmit="app.addToWatchlist(event)" style="display: flex; gap: 8px; align-items: center;">
-                <input type="text" id="watchlist-input-symbol" class="form-input" placeholder="Ticker (ej: PLTR, AMD, DIS)" style="width: 180px; padding: 5px 10px; text-transform: uppercase; font-weight: bold;" required>
-                <button type="submit" class="btn btn-primary" style="padding: 5px 12px; font-size: 12px;">
-                  ➕ Agregar al Radar
-                </button>
-              </form>
-            </div>
-
-            <!-- Tabla del Radar de Oportunidades -->
-            <div style="overflow-x: auto; margin-top: 12px;">
-              <table class="data-table" style="font-size: 12px;">
-                <thead>
-                  <tr>
-                    <th>Empresa / Ticker</th>
-                    <th>Precio Actual</th>
-                    <th>RSI (14d)</th>
-                    <th>Medias Móviles (50d / 200d)</th>
-                    <th>Soporte / Resistencia</th>
-                    <th>Indicador de Decisión</th>
-                    <th style="text-align: center;">Acción</th>
-                  </tr>
-                </thead>
-                <tbody id="tbody-watchlist">
-                  <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 15px;">Cargando Radar de Análisis Técnico...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- SECCIÓN DE NOTICIAS EN ESPAÑOL DE LAS ÚLTIMAS 24 HORAS -->
-          <div class="card">
-            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-              <span>📰 Noticias & Novedades Bursátiles (Tus Posiciones - Últimas 24h)</span>
-              <span class="badge-up" style="font-size: 11px; padding: 3px 8px;">🔄 Actualización en Vivo (24 Horas)</span>
-            </div>
-            <div class="news-feed-container" id="news-feed-container">
-              <div style="text-align: center; color: var(--text-muted); padding: 20px;">Cargando noticias recientes de tus acciones (Últimas 24h)...</div>
-            </div>
+          <div class="chart-container">
+            <canvas id="chart-intraday-line"></canvas>
           </div>
         </div>
 
-        <!-- Columna Derecha: BARRA DE ACCIONES VERTICAL -->
-        <div class="dashboard-right">
-          <div class="card">
-            <div class="card-title">
-              <span>📱 Cotizaciones en Vivo (Lista Vertical)</span>
-              <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);">Bolsa EE.UU.</span>
-            </div>
-            <div class="vertical-ticker-list" id="vertical-ticker-list">
-              <div class="ticker-loading">Cargando cotizaciones...</div>
-            </div>
+        <!-- CARD 2: GRÁFICO DE EVOLUCIÓN HISTÓRICA (VALOR TOTAL VS TIEMPO) -->
+        <div class="card" style="margin-bottom: 24px;">
+          <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>📈 Evolución Histórica de la Cartera (Valor Total vs Tiempo)</span>
+            <span style="font-size: 11px; font-weight: normal; color: var(--success);">Ganancia / Pérdida Acumulada Real</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-historical-line"></canvas>
+          </div>
+        </div>
+
+        <!-- CARD: RADAR DE OPORTUNIDADES & ANÁLISIS TÉCNICO DE CORTO PLAZO -->
+        <div class="card" style="margin-bottom: 24px;">
+          <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <span>🎯 Radar de Oportunidades & Análisis Técnico (Corto Plazo)</span>
+            
+            <!-- Formulario de Agregar Ticker al Radar -->
+            <form onsubmit="app.addToWatchlist(event)" style="display: flex; gap: 8px; align-items: center;">
+              <input type="text" id="watchlist-input-symbol" class="form-input" placeholder="Ticker (ej: PLTR, AMD, DIS)" style="width: 180px; padding: 5px 10px; text-transform: uppercase; font-weight: bold;" required>
+              <button type="submit" class="btn btn-primary" style="padding: 5px 12px; font-size: 12px;">
+                ➕ Agregar al Radar
+              </button>
+            </form>
+          </div>
+
+          <!-- Tabla del Radar de Oportunidades -->
+          <div style="overflow-x: auto; margin-top: 12px;">
+            <table class="data-table" style="font-size: 12px;">
+              <thead>
+                <tr>
+                  <th>Empresa / Ticker</th>
+                  <th>Precio Actual</th>
+                  <th>RSI (14d)</th>
+                  <th>Medias Móviles (50d / 200d)</th>
+                  <th>Soporte / Resistencia</th>
+                  <th>Indicador de Decisión</th>
+                  <th style="text-align: center;">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-watchlist">
+                <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 15px;">Cargando Radar de Análisis Técnico...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SECCIÓN DE NOTICIAS EN ESPAÑOL DE LAS ÚLTIMAS 24 HORAS -->
+        <div class="card">
+          <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <span>📰 Noticias & Novedades Bursátiles (Tus Posiciones - Últimas 24h)</span>
+            <span class="badge-up" style="font-size: 11px; padding: 3px 8px;">🔄 Actualización en Vivo (24 Horas)</span>
+          </div>
+          <div class="news-feed-container" id="news-feed-container">
+            <div style="text-align: center; color: var(--text-muted); padding: 20px;">Cargando noticias recientes de tus acciones (Últimas 24h)...</div>
           </div>
         </div>
       </div>
@@ -1080,6 +1067,6 @@
   </div>
 
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=2.5.1"></script>
+  <script src="/js/app.js?v=2.6.0"></script>
 </body>
 </html>

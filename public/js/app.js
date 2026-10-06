@@ -260,6 +260,7 @@ const app = {
 
   renderSummary(s) {
     const heroFloatingVal = document.getElementById('hero-floating-val');
+    const heroFloatingPct = document.getElementById('hero-floating-pct');
     const heroTotal = document.getElementById('hero-total-portfolio');
     const heroOpenInv = document.getElementById('hero-open-invested');
     const heroDaily = document.getElementById('hero-daily-change');
@@ -272,14 +273,19 @@ const app = {
     const isPos = uGain >= 0;
 
     if (heroFloatingVal) {
-      heroFloatingVal.innerText = `${isPos ? '+' : ''}$${uGain.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${isPos ? '+' : ''}${uPct.toFixed(2)}%)`;
+      heroFloatingVal.innerText = `${isPos ? '+' : ''}$${uGain.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
       heroFloatingVal.className = `hero-value ${isPos ? '' : 'negative'}`;
+    }
+    if (heroFloatingPct) {
+      heroFloatingPct.innerText = `${isPos ? '▲ +' : '▼ '}${uPct.toFixed(2)}% Flotante`;
+      heroFloatingPct.className = `hero-floating-pct-badge ${isPos ? 'pill-up' : 'pill-down'}`;
     }
     if (heroTotal) heroTotal.innerText = `$${s.totalPortfolioValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
     if (heroOpenInv) heroOpenInv.innerText = `$${s.totalOpenInvested.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
     if (heroDaily) {
-      const dSign = (s.totalDailyChangeDollar || 0) >= 0 ? '+' : '';
-      heroDaily.innerText = `${dSign}$${(s.totalDailyChangeDollar || 0).toFixed(2)}`;
+      const dailyVal = s.dailyChangeDollar !== undefined ? s.dailyChangeDollar : (s.totalDailyChangeDollar || 0);
+      const dSign = dailyVal >= 0 ? '+' : '';
+      heroDaily.innerText = `${dSign}$${dailyVal.toFixed(2)}`;
     }
     if (heroClosed) heroClosed.innerText = `+$${s.totalRealizedGain.toLocaleString('en-US', { minimumFractionDigits: 2 })} (+${s.realizedGainPercent.toFixed(1)}%)`;
     if (heroWinrate) heroWinrate.innerText = `${s.winRatePercent.toFixed(1)}% (${s.winningTradesCount || 0} de ${s.closedPositionsCount})`;
