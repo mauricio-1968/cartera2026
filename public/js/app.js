@@ -280,6 +280,14 @@ const app = {
       heroFloatingPct.innerText = `${isPos ? '▲ +' : '▼ '}${uPct.toFixed(2)}% Flotante`;
       heroFloatingPct.className = `hero-floating-pct-badge ${isPos ? 'pill-up' : 'pill-down'}`;
     }
+    const heroPulseDot = document.querySelector('.hero-pulse-dot');
+    if (heroPulseDot) {
+      if (isPos) {
+        heroPulseDot.classList.remove('negative');
+      } else {
+        heroPulseDot.classList.add('negative');
+      }
+    }
     if (heroTotal) heroTotal.innerText = `$${s.totalPortfolioValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
     if (heroOpenInv) heroOpenInv.innerText = `$${s.totalOpenInvested.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
     if (heroDaily) {
