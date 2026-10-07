@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=2.7.0">
+  <link rel="stylesheet" href="/css/styles.css?v=2.7.1">
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -164,29 +164,25 @@
             </div>
 
             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-              <!-- Selector de Rango Temporal (Día, Semana, Mes) -->
-              <div style="display: flex; background: var(--bg-dark); border-radius: 8px; padding: 2px; border: 1px solid var(--border-color);" title="Rango de tiempo">
-                <button type="button" id="btn-chart-range-1d" class="btn btn-secondary btn-chart-opt active" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartRange('1d')">
-                  1 Día
-                </button>
-                <button type="button" id="btn-chart-range-5d" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartRange('5d')">
-                  1 Semana
-                </button>
-                <button type="button" id="btn-chart-range-1mo" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartRange('1mo')">
-                  1 Mes
-                </button>
-              </div>
-
-              <!-- Selector de Intervalo (10 min, 15 min, 30 min) -->
-              <div style="display: flex; background: var(--bg-dark); border-radius: 8px; padding: 2px; border: 1px solid var(--border-color);" title="Intervalo / Velas">
-                <button type="button" id="btn-chart-int-10m" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartInterval('10m')">
+              <!-- Selector Único de Temporalidad (10m, 15m, 30m, 1 Día, 1 Semana, 1 Mes) -->
+              <div style="display: flex; background: var(--bg-dark); border-radius: 8px; padding: 2px; border: 1px solid var(--border-color);" title="Seleccionar Temporalidad">
+                <button type="button" id="btn-tf-10m" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setTimeframe('10m')">
                   10m
                 </button>
-                <button type="button" id="btn-chart-int-15m" class="btn btn-secondary btn-chart-opt active" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartInterval('15m')">
+                <button type="button" id="btn-tf-15m" class="btn btn-secondary btn-chart-opt active" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setTimeframe('15m')">
                   15m
                 </button>
-                <button type="button" id="btn-chart-int-30m" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartInterval('30m')">
+                <button type="button" id="btn-tf-30m" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setTimeframe('30m')">
                   30m
+                </button>
+                <button type="button" id="btn-tf-1d" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setTimeframe('1d')">
+                  1 Día
+                </button>
+                <button type="button" id="btn-tf-1w" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setTimeframe('1w')">
+                  1 Sem
+                </button>
+                <button type="button" id="btn-tf-1m" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setTimeframe('1m')">
+                  1 Mes
                 </button>
               </div>
 
@@ -1098,6 +1094,6 @@
   </div>
 
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=2.7.0"></script>
+  <script src="/js/app.js?v=2.7.1"></script>
 </body>
 </html>

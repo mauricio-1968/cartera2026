@@ -549,20 +549,35 @@ const app = {
   },
 
   intradayChartStyle: 'line', // 'line' o 'candle'
-  intradayRange: '1d',        // '1d', '5d', '1mo'
-  intradayInterval: '15m',    // '10m', '15m', '30m'
+  currentTimeframe: '15m',    // '10m', '15m', '30m', '1d', '1w', '1m'
   showVolume: true,
 
-  setChartRange(range) {
-    this.intradayRange = range;
+  timeframeConfigs: {
+    '10m': { interval: '10m', range: '1d', label: '10 Minutos' },
+    '15m': { interval: '15m', range: '1d', label: '15 Minutos' },
+    '30m': { interval: '30m', range: '1d', label: '30 Minutos' },
+    '1d':  { interval: '5m',  range: '1d', label: '1 Día' },
+    '1w':  { interval: '15m', range: '5d', label: '1 Semana' },
+    '1m':  { interval: '1d',  range: '1mo', label: '1 Mes' }
+  },
+
+  setTimeframe(tf) {
+    if (!this.timeframeConfigs[tf]) tf = '15m';
+    this.currentTimeframe = tf;
     this.updateChartButtons();
     this.fetchAndRenderIntradayChart(this.selectedIntradaySymbol);
   },
 
+  // Métodos de compatibilidad hacia atrás
+  setChartRange(range) {
+    if (range === '5d') this.setTimeframe('1w');
+    else if (range === '1mo') this.setTimeframe('1m');
+    else this.setTimeframe('1d');
+  },
   setChartInterval(interval) {
-    this.intradayInterval = interval;
-    this.updateChartButtons();
-    this.fetchAndRenderIntradayChart(this.selectedIntradaySymbol);
+    if (interval === '10m') this.setTimeframe('10m');
+    else if (interval === '30m') this.setTimeframe('30m');
+    else this.setTimeframe('15m');
   },
 
   setChartStyle(style) {
@@ -578,11 +593,11 @@ const app = {
   },
 
   updateChartButtons() {
-    // 1. Rango (1d, 5d, 1mo)
-    ['1d', '5d', '1mo'].forEach(r => {
-      const btn = document.getElementById(`btn-chart-range-${r}`);
+    // 1. Selector único de temporalidad (solo uno activo a la vez)
+    Object.keys(this.timeframeConfigs).forEach(tf => {
+      const btn = document.getElementById(`btn-tf-${tf}`);
       if (btn) {
-        if (this.intradayRange === r) {
+        if (this.currentTimeframe === tf) {
           btn.classList.add('active');
         } else {
           btn.classList.remove('active');
@@ -590,19 +605,7 @@ const app = {
       }
     });
 
-    // 2. Intervalo (10m, 15m, 30m)
-    ['10m', '15m', '30m'].forEach(int => {
-      const btn = document.getElementById(`btn-chart-int-${int}`);
-      if (btn) {
-        if (this.intradayInterval === int) {
-          btn.classList.add('active');
-        } else {
-          btn.classList.remove('active');
-        }
-      }
-    });
-
-    // 3. Estilo (line, candle)
+    // 2. Estilo (line, candle)
     const btnLine = document.getElementById('btn-chart-style-line');
     const btnCandle = document.getElementById('btn-chart-style-candle');
     if (btnLine) {
@@ -614,7 +617,7 @@ const app = {
       else btnCandle.classList.remove('active');
     }
 
-    // 4. Volumen
+    // 3. Volumen
     const btnVol = document.getElementById('btn-chart-volume');
     const txtVol = document.getElementById('volume-status-text');
     if (txtVol) txtVol.innerText = this.showVolume ? 'ON' : 'OFF';
@@ -623,11 +626,11 @@ const app = {
       else btnVol.classList.remove('active');
     }
 
-    // 5. Badge informativo
+    // 4. Badge informativo de temporalidad activa
     const badge = document.getElementById('chart-info-badge');
     if (badge) {
-      const rangeMap = { '1d': '1 Día', '5d': '1 Semana', '1mo': '1 Mes' };
-      badge.innerText = `${rangeMap[this.intradayRange] || this.intradayRange} • ${this.intradayInterval}`;
+      const config = this.timeframeConfigs[this.currentTimeframe] || this.timeframeConfigs['15m'];
+      badge.innerText = config.label;
     }
   },
 
@@ -661,8 +664,10 @@ const app = {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
+    const config = this.timeframeConfigs[this.currentTimeframe] || this.timeframeConfigs['15m'];
+
     try {
-      const res = await fetch(`/api/chart/intraday?symbol=${encodeURIComponent(symbol)}&interval=${this.intradayInterval}&range=${this.intradayRange}&_t=${Date.now()}`);
+      const res = await fetch(`/api/chart/intraday?symbol=${encodeURIComponent(symbol)}&interval=${config.interval}&range=${config.range}&_t=${Date.now()}`);
       if (!res.ok) throw new Error('Error al obtener datos intradiarios');
       const data = await res.json();
 
