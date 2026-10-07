@@ -7,4 +7,5 @@ android/build/
 android/app/build/
 database/portfolio.db
 public/*.apk
+!public/Portrack.apk
 public/*.aab
