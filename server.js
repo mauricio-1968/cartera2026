@@ -632,10 +632,12 @@ app.get('/api/prices', async (req, res) => {
   res.json(prices);
 });
 
-// 8. Endpoint de gráfico intradiario (cada 30 min)
+// 8. Endpoint de gráfico intradiario / evolutivo (10m, 15m, 30m por 1d, 5d, 1mo)
 app.get('/api/chart/intraday', async (req, res) => {
   const symbol = req.query.symbol || 'TSLA';
-  const data = await getIntradayChartData(symbol);
+  const interval = req.query.interval || '15m';
+  const range = req.query.range || '1d';
+  const data = await getIntradayChartData(symbol, interval, range);
   res.json(data);
 });
 

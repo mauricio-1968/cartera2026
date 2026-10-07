@@ -992,3 +992,26 @@ body.dark-theme .data-table th {
     justify-content: space-between;
   }
 }
+
+/* ==========================================================
+   CHART CONTROLS (RANGE & INTERVAL SELECTORS)
+   ========================================================== */
+.btn-chart-opt {
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  border: none !important;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-weight: 700 !important;
+}
+
+.btn-chart-opt:hover {
+  color: var(--text-main) !important;
+  background: var(--bg-card-hover) !important;
+}
+
+.btn-chart-opt.active {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3) !important;
+}

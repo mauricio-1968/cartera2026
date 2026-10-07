@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=2.6.1">
+  <link rel="stylesheet" href="/css/styles.css?v=2.7.0">
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -155,27 +155,58 @@
 
       <!-- Dashboard Layout de Ancho Completo -->
       <div class="dashboard-full-width">
-        <!-- CARD 1: GRÁFICO INTRADIARIO (LÍNEA VS VELAS JAPONESAS VS VOLUMEN) -->
+        <!-- CARD 1: GRÁFICO DINÁMICO DE EVOLUCIÓN DE PRECIO Y VOLUMEN -->
         <div class="card" style="margin-bottom: 24px;">
-          <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-            <span>📈 Evolución Intradiaria del Precio y Volumen (Cada 30 min - Hoy)</span>
-            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-              <!-- Selector de Estilo de Gráfico -->
-              <div style="display: flex; background: rgba(0,0,0,0.06); border-radius: 8px; padding: 2px; border: 1px solid var(--border-color);">
-                <button type="button" id="btn-chart-style-line" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="app.setChartStyle('line')">
-                  📈 Línea
+          <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span>📈 Evolución del Precio y Volumen</span>
+              <span id="chart-info-badge" style="font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--primary-light); color: var(--primary); border: 1px solid var(--success-border);">1 Día • 15m</span>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <!-- Selector de Rango Temporal (Día, Semana, Mes) -->
+              <div style="display: flex; background: var(--bg-dark); border-radius: 8px; padding: 2px; border: 1px solid var(--border-color);" title="Rango de tiempo">
+                <button type="button" id="btn-chart-range-1d" class="btn btn-secondary btn-chart-opt active" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartRange('1d')">
+                  1 Día
                 </button>
-                <button type="button" id="btn-chart-style-candle" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="app.setChartStyle('candle')">
-                  🕯️ Velas Japonesas
+                <button type="button" id="btn-chart-range-5d" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartRange('5d')">
+                  1 Semana
                 </button>
-                <button type="button" id="btn-chart-volume" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px; margin-left: 4px;" onclick="app.toggleVolume()">
-                  📊 Volumen (<span id="volume-status-text">ON</span>)
+                <button type="button" id="btn-chart-range-1mo" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartRange('1mo')">
+                  1 Mes
                 </button>
               </div>
 
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <label style="font-size: 12px; color: var(--text-muted);">Acción:</label>
-                <select id="chart-stock-select" class="form-input" style="padding: 4px 10px; font-size: 13px; width: auto; font-weight: bold;" onchange="app.changeIntradaySymbol(this.value)">
+              <!-- Selector de Intervalo (10 min, 15 min, 30 min) -->
+              <div style="display: flex; background: var(--bg-dark); border-radius: 8px; padding: 2px; border: 1px solid var(--border-color);" title="Intervalo / Velas">
+                <button type="button" id="btn-chart-int-10m" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartInterval('10m')">
+                  10m
+                </button>
+                <button type="button" id="btn-chart-int-15m" class="btn btn-secondary btn-chart-opt active" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartInterval('15m')">
+                  15m
+                </button>
+                <button type="button" id="btn-chart-int-30m" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartInterval('30m')">
+                  30m
+                </button>
+              </div>
+
+              <!-- Selector de Estilo de Gráfico -->
+              <div style="display: flex; background: var(--bg-dark); border-radius: 8px; padding: 2px; border: 1px solid var(--border-color);">
+                <button type="button" id="btn-chart-style-line" class="btn btn-secondary btn-chart-opt active" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartStyle('line')">
+                  📈 Línea
+                </button>
+                <button type="button" id="btn-chart-style-candle" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartStyle('candle')">
+                  🕯️ Velas
+                </button>
+                <button type="button" id="btn-chart-volume" class="btn btn-secondary btn-chart-opt active" style="padding: 4px 9px; font-size: 11px; border-radius: 6px; margin-left: 2px;" onclick="app.toggleVolume()">
+                  📊 Vol (<span id="volume-status-text">ON</span>)
+                </button>
+              </div>
+
+              <!-- Selector de Acción -->
+              <div style="display: flex; align-items: center; gap: 5px;">
+                <label style="font-size: 11px; color: var(--text-muted); font-weight: 700;">Acción:</label>
+                <select id="chart-stock-select" class="form-input" style="padding: 4px 10px; font-size: 12px; width: auto; font-weight: 800;" onchange="app.changeIntradaySymbol(this.value)">
                   <!-- Opciones dinámicas -->
                 </select>
               </div>
@@ -1067,6 +1098,6 @@
   </div>
 
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=2.6.1"></script>
+  <script src="/js/app.js?v=2.7.0"></script>
 </body>
 </html>

@@ -548,34 +548,87 @@ const app = {
     }
   },
 
-  toggleVolume() {
-    this.showVolume = !this.showVolume;
-    const txt = document.getElementById('volume-status-text');
-    const btn = document.getElementById('btn-chart-volume');
-    if (txt) txt.innerText = this.showVolume ? 'ON' : 'OFF';
-    if (btn) {
-      btn.style.background = this.showVolume ? 'var(--primary)' : 'transparent';
-      btn.style.color = this.showVolume ? '#fff' : 'var(--text-muted)';
-    }
+  intradayChartStyle: 'line', // 'line' o 'candle'
+  intradayRange: '1d',        // '1d', '5d', '1mo'
+  intradayInterval: '15m',    // '10m', '15m', '30m'
+  showVolume: true,
+
+  setChartRange(range) {
+    this.intradayRange = range;
+    this.updateChartButtons();
     this.fetchAndRenderIntradayChart(this.selectedIntradaySymbol);
   },
 
-  intradayChartStyle: 'line', // 'line' o 'candle'
+  setChartInterval(interval) {
+    this.intradayInterval = interval;
+    this.updateChartButtons();
+    this.fetchAndRenderIntradayChart(this.selectedIntradaySymbol);
+  },
 
   setChartStyle(style) {
     this.intradayChartStyle = style;
+    this.updateChartButtons();
+    this.fetchAndRenderIntradayChart(this.selectedIntradaySymbol);
+  },
+
+  toggleVolume() {
+    this.showVolume = !this.showVolume;
+    this.updateChartButtons();
+    this.fetchAndRenderIntradayChart(this.selectedIntradaySymbol);
+  },
+
+  updateChartButtons() {
+    // 1. Rango (1d, 5d, 1mo)
+    ['1d', '5d', '1mo'].forEach(r => {
+      const btn = document.getElementById(`btn-chart-range-${r}`);
+      if (btn) {
+        if (this.intradayRange === r) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      }
+    });
+
+    // 2. Intervalo (10m, 15m, 30m)
+    ['10m', '15m', '30m'].forEach(int => {
+      const btn = document.getElementById(`btn-chart-int-${int}`);
+      if (btn) {
+        if (this.intradayInterval === int) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      }
+    });
+
+    // 3. Estilo (line, candle)
     const btnLine = document.getElementById('btn-chart-style-line');
     const btnCandle = document.getElementById('btn-chart-style-candle');
-
-    if (style === 'line') {
-      if (btnLine) { btnLine.style.background = 'var(--primary)'; btnLine.style.color = '#fff'; }
-      if (btnCandle) { btnCandle.style.background = 'transparent'; btnCandle.style.color = 'var(--text-muted)'; }
-    } else {
-      if (btnCandle) { btnCandle.style.background = 'var(--primary)'; btnCandle.style.color = '#fff'; }
-      if (btnLine) { btnLine.style.background = 'transparent'; btnLine.style.color = 'var(--text-muted)'; }
+    if (btnLine) {
+      if (this.intradayChartStyle === 'line') btnLine.classList.add('active');
+      else btnLine.classList.remove('active');
+    }
+    if (btnCandle) {
+      if (this.intradayChartStyle === 'candle') btnCandle.classList.add('active');
+      else btnCandle.classList.remove('active');
     }
 
-    this.fetchAndRenderIntradayChart(this.selectedIntradaySymbol);
+    // 4. Volumen
+    const btnVol = document.getElementById('btn-chart-volume');
+    const txtVol = document.getElementById('volume-status-text');
+    if (txtVol) txtVol.innerText = this.showVolume ? 'ON' : 'OFF';
+    if (btnVol) {
+      if (this.showVolume) btnVol.classList.add('active');
+      else btnVol.classList.remove('active');
+    }
+
+    // 5. Badge informativo
+    const badge = document.getElementById('chart-info-badge');
+    if (badge) {
+      const rangeMap = { '1d': '1 Día', '5d': '1 Semana', '1mo': '1 Mes' };
+      badge.innerText = `${rangeMap[this.intradayRange] || this.intradayRange} • ${this.intradayInterval}`;
+    }
   },
 
   renderCharts(openPositions) {
@@ -594,7 +647,7 @@ const app = {
       }
     }
 
-    this.setChartStyle(this.intradayChartStyle);
+    this.updateChartButtons();
     this.fetchAndRenderHistoricalChart();
   },
 
@@ -609,7 +662,7 @@ const app = {
     const ctx = canvas.getContext('2d');
 
     try {
-      const res = await fetch(`/api/chart/intraday?symbol=${encodeURIComponent(symbol)}&_t=${Date.now()}`);
+      const res = await fetch(`/api/chart/intraday?symbol=${encodeURIComponent(symbol)}&interval=${this.intradayInterval}&range=${this.intradayRange}&_t=${Date.now()}`);
       if (!res.ok) throw new Error('Error al obtener datos intradiarios');
       const data = await res.json();
 
