@@ -651,6 +651,7 @@ const app = {
     }
 
     this.updateChartButtons();
+    this.fetchAndRenderIntradayChart(this.selectedIntradaySymbol);
     this.fetchAndRenderHistoricalChart();
   },
 
@@ -676,13 +677,16 @@ const app = {
       const volumes = points.map(p => p.volume || 0);
 
       const maxVol = Math.max(...volumes, 1);
-      const volColors = points.map(p => p.close >= p.open ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)');
+      const isDark = document.body.classList.contains('dark-theme');
+      const greenHex = isDark ? '#28CC95' : '#00B87C';
+      const redHex = isDark ? '#F24E4E' : '#E53935';
+
+      const volColors = points.map(p => p.close >= p.open ? 'rgba(0, 184, 124, 0.25)' : 'rgba(229, 57, 53, 0.25)');
 
       if (this.charts.intraday) this.charts.intraday.destroy();
 
-      const isLight = document.body.classList.contains('light-theme');
-      const gridColor = isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.04)';
-      const tickColor = isLight ? '#475569' : '#9ca3af';
+      const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(13, 16, 23, 0.05)';
+      const tickColor = isDark ? '#8A94A6' : '#5A6577';
 
       const datasets = [];
 
@@ -702,29 +706,36 @@ const app = {
         const lastPrice = data.currentPrice || (prices[prices.length - 1] || firstPrice);
         const isPositive = lastPrice >= firstPrice;
 
-        const strokeColor = isPositive ? (isLight ? '#059669' : '#10b981') : (isLight ? '#dc2626' : '#ef4444');
-        const bgGradient = ctx.createLinearGradient(0, 0, 0, 260);
+        const strokeColor = isPositive ? greenHex : redHex;
+        const bgGradient = ctx.createLinearGradient(0, 0, 0, 280);
         if (isPositive) {
-          bgGradient.addColorStop(0, 'rgba(16, 185, 129, 0.3)');
-          bgGradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+          bgGradient.addColorStop(0, isDark ? 'rgba(40, 204, 149, 0.24)' : 'rgba(0, 184, 124, 0.18)');
+          bgGradient.addColorStop(1, 'rgba(0, 184, 124, 0.0)');
         } else {
-          bgGradient.addColorStop(0, 'rgba(239, 68, 68, 0.3)');
-          bgGradient.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
+          bgGradient.addColorStop(0, isDark ? 'rgba(242, 78, 78, 0.24)' : 'rgba(229, 57, 53, 0.16)');
+          bgGradient.addColorStop(1, 'rgba(229, 57, 53, 0.0)');
         }
+
+        // Estilo Kalshi: Línea nítida sin puntos intermedios, solo punto final luminoso
+        const pointRadii = prices.map((_, idx) => (idx === prices.length - 1 ? 4.5 : 0));
 
         datasets.push({
           type: 'line',
           label: `${symbol} (US$)`,
           data: prices,
           borderColor: strokeColor,
-          borderWidth: 3,
+          borderWidth: 2.5,
           backgroundColor: bgGradient,
           fill: true,
-          tension: 0.35,
+          tension: 0.28,
           pointBackgroundColor: strokeColor,
-          pointBorderColor: '#fff',
-          pointRadius: 4,
-          pointHoverRadius: 7,
+          pointBorderColor: isDark ? '#12161C' : '#FFFFFF',
+          pointBorderWidth: 2,
+          pointRadius: pointRadii,
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: strokeColor,
+          pointHoverBorderColor: '#FFFFFF',
+          pointHoverBorderWidth: 2,
           yAxisID: 'y'
         });
       }
@@ -736,8 +747,8 @@ const app = {
           label: 'Volumen Transado',
           data: volumes,
           backgroundColor: volColors,
-          borderColor: volColors,
-          borderWidth: 1,
+          borderColor: 'transparent',
+          borderRadius: 2,
           yAxisID: 'yVolume'
         });
       }
@@ -746,16 +757,17 @@ const app = {
       const allHighs = points.map(p => p.high || p.price);
       const minPrice = Math.min(...allLows);
       const maxPrice = Math.max(...allHighs);
-      const padding = (maxPrice - minPrice) * 0.05 || 1.0;
+      const padding = (maxPrice - minPrice) * 0.06 || 1.0;
 
       const yMin = Math.floor((minPrice - padding) * 100) / 100;
       const yMax = Math.ceil((maxPrice + padding) * 100) / 100;
 
-      const candlePlugin = {
-        id: 'candlePlugin',
+      const kalshiChartPlugin = {
+        id: 'kalshiChartPlugin',
         beforeDatasetsDraw(chart) {
           if (app.intradayChartStyle !== 'candle') return;
           const { ctx, scales: { x, y } } = chart;
+          const candleWidth = Math.max(4, Math.min(12, Math.floor((chart.chartArea.width / Math.max(points.length, 1)) * 0.6)));
           points.forEach((p, i) => {
             const xPos = x.getPixelForValue(i);
             const highY = y.getPixelForValue(p.high);
@@ -763,30 +775,43 @@ const app = {
             const openY = y.getPixelForValue(p.open);
             const closeY = y.getPixelForValue(p.close);
             const isGreen = p.close >= p.open;
-            const color = isGreen ? '#10b981' : '#ef4444';
-            const strokeBorder = isGreen ? '#059669' : '#dc2626';
+            const color = isGreen ? greenHex : redHex;
 
             ctx.save();
             ctx.strokeStyle = color;
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(xPos, highY);
             ctx.lineTo(xPos, lowY);
             ctx.stroke();
 
             const topY = Math.min(openY, closeY);
-            const bodyHeight = Math.max(Math.abs(closeY - openY), 3);
-            const candleWidth = 14;
+            const bodyHeight = Math.max(Math.abs(closeY - openY), 2.5);
 
             ctx.fillStyle = color;
             ctx.fillRect(xPos - candleWidth / 2, topY, candleWidth, bodyHeight);
-
-            ctx.strokeStyle = strokeBorder;
-            ctx.lineWidth = 1;
-            ctx.strokeRect(xPos - candleWidth / 2, topY, candleWidth, bodyHeight);
-
             ctx.restore();
           });
+        },
+        afterDraw(chart) {
+          // Línea guía vertical (Crosshair estilo Kalshi) al pasar el mouse
+          if (chart.tooltip?._active?.length) {
+            const activePoint = chart.tooltip._active[0];
+            const ctx = chart.ctx;
+            const x = activePoint.element.x;
+            const topY = chart.scales.y.top;
+            const bottomY = chart.scales.y.bottom;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(x, topY);
+            ctx.lineTo(x, bottomY);
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(13, 16, 23, 0.25)';
+            ctx.stroke();
+            ctx.restore();
+          }
         }
       };
 
@@ -798,65 +823,81 @@ const app = {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
           scales: {
             x: {
-              ticks: { color: tickColor, font: { family: 'Outfit', size: 11 } },
-              grid: { color: gridColor }
+              border: { display: false },
+              ticks: {
+                color: tickColor,
+                maxTicksLimit: 8,
+                font: { family: 'Inter', size: 11, weight: '500' }
+              },
+              grid: { display: false }
             },
             y: {
               type: 'linear',
-              position: 'left',
+              position: 'right',
               min: yMin,
               max: yMax,
+              border: { display: false },
               ticks: {
                 color: tickColor,
-                font: { family: 'Outfit', size: 11 },
+                font: { family: 'JetBrains Mono, Inter', size: 11, weight: '600' },
                 callback: function(v) { return '$' + v.toFixed(2); }
               },
-              grid: { color: gridColor }
+              grid: {
+                color: gridColor,
+                borderDash: [4, 4]
+              }
             },
             yVolume: {
               type: 'linear',
-              position: 'right',
+              position: 'left',
               display: false,
               min: 0,
-              max: maxVol * 4 // Mantiene las barras de volumen en el 25% inferior del gráfico
+              max: maxVol * 4.2
             }
           },
           plugins: {
             legend: { display: false },
             tooltip: {
+              backgroundColor: isDark ? 'rgba(18, 22, 28, 0.96)' : 'rgba(13, 16, 23, 0.94)',
+              titleFont: { family: 'Inter', size: 11, weight: '700' },
+              bodyFont: { family: 'Inter', size: 12, weight: '600' },
+              padding: 10,
+              cornerRadius: 8,
+              displayColors: false,
               callbacks: {
                 label: function(context) {
                   const p = points[context.dataIndex];
-                  const volStr = p.volume ? p.volume.toLocaleString('es-ES') + ' acciones' : '0 acciones';
+                  const volStr = p.volume ? p.volume.toLocaleString('es-ES') + ' acc' : '0 acc';
                   if (app.intradayChartStyle === 'candle') {
                     if (context.datasetIndex === 0) {
                       return [
-                        `Hora: ${p.time} (NY)`,
-                        `Apertura: $${p.open.toFixed(2)}`,
-                        `Máximo: $${p.high.toFixed(2)}`,
-                        `Mínimo: $${p.low.toFixed(2)}`,
-                        `Cierre: $${p.close.toFixed(2)}`,
-                        `Volumen Transado: ${volStr}`
+                        `🕒 ${p.time} (NY)`,
+                        `Apertura: $${p.open.toFixed(2)}  |  Cierre: $${p.close.toFixed(2)}`,
+                        `Máx: $${p.high.toFixed(2)}  |  Mín: $${p.low.toFixed(2)}`,
+                        `Volumen: ${volStr}`
                       ];
                     }
                   } else {
                     if (context.datasetIndex === 0) {
                       return [
-                        `Hora: ${p.time} (NY)`,
-                        `Precio Cierre: $${p.close.toFixed(2)}`,
-                        `Volumen Transado: ${volStr}`
+                        `Precio: $${p.close.toFixed(2)}`,
+                        `Volumen: ${volStr}`
                       ];
                     }
                   }
-                  return `Volumen Transado: ${volStr}`;
+                  return null;
                 }
               }
             }
           }
         },
-        plugins: [candlePlugin]
+        plugins: [kalshiChartPlugin]
       });
 
     } catch (err) {
@@ -865,7 +906,7 @@ const app = {
   },
 
   // ==========================================
-  // GRÁFICO HISTÓRICO DE VALOR TOTAL DE CARTERA VS TIEMPO
+  // GRÁFICO HISTÓRICO DE VALOR TOTAL DE CARTERA VS TIEMPO (ESTILO KALSHI)
   // ==========================================
   async fetchAndRenderHistoricalChart() {
     const canvas = document.getElementById('chart-historical-line');
@@ -886,11 +927,18 @@ const app = {
       const totalValues = timeline.map(t => t.totalValue);
       const investedValues = timeline.map(t => t.invested);
 
-      const bgGradient = ctx.createLinearGradient(0, 0, 0, 260);
-      bgGradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
-      bgGradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+      const isDark = document.body.classList.contains('dark-theme');
+      const greenHex = isDark ? '#28CC95' : '#00B87C';
+      const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(13, 16, 23, 0.05)';
+      const tickColor = isDark ? '#8A94A6' : '#5A6577';
+
+      const bgGradient = ctx.createLinearGradient(0, 0, 0, 280);
+      bgGradient.addColorStop(0, isDark ? 'rgba(40, 204, 149, 0.25)' : 'rgba(0, 184, 124, 0.18)');
+      bgGradient.addColorStop(1, 'rgba(0, 184, 124, 0.0)');
 
       if (this.charts.historical) this.charts.historical.destroy();
+
+      const pointRadii = totalValues.map((_, idx) => (idx === totalValues.length - 1 ? 4.5 : 0));
 
       this.charts.historical = new Chart(ctx, {
         type: 'line',
@@ -900,52 +948,64 @@ const app = {
             {
               label: 'Valor Total Cartera US$',
               data: totalValues,
-              borderColor: '#10b981',
-              borderWidth: 3,
+              borderColor: greenHex,
+              borderWidth: 2.5,
               backgroundColor: bgGradient,
               fill: true,
-              tension: 0.3,
-              pointBackgroundColor: '#10b981',
-              pointBorderColor: '#fff',
-              pointRadius: 4,
-              pointHoverRadius: 7
+              tension: 0.28,
+              pointBackgroundColor: greenHex,
+              pointBorderColor: isDark ? '#12161C' : '#FFFFFF',
+              pointBorderWidth: 2,
+              pointRadius: pointRadii,
+              pointHoverRadius: 6
             },
             {
               label: 'Capital Invertido US$',
               data: investedValues,
-              borderColor: '#3b82f6',
-              borderWidth: 2,
-              borderDash: [6, 4],
+              borderColor: '#1D6FF2',
+              borderWidth: 1.8,
+              borderDash: [5, 5],
               backgroundColor: 'transparent',
               fill: false,
-              tension: 0.1,
-              pointRadius: 3
+              tension: 0.15,
+              pointRadius: 0,
+              pointHoverRadius: 4
             }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
           scales: {
             x: {
-              ticks: { color: '#9ca3af', font: { family: 'Outfit', size: 11 } },
-              grid: { color: 'rgba(255,255,255,0.04)' }
+              border: { display: false },
+              ticks: { color: tickColor, font: { family: 'Inter', size: 11, weight: '500' } },
+              grid: { display: false }
             },
             y: {
+              position: 'right',
+              border: { display: false },
               ticks: {
-                color: '#9ca3af',
-                font: { family: 'Outfit', size: 11 },
+                color: tickColor,
+                font: { family: 'JetBrains Mono, Inter', size: 11, weight: '600' },
                 callback: function(v) { return '$' + v.toLocaleString('en-US'); }
               },
-              grid: { color: 'rgba(255,255,255,0.04)' }
+              grid: { color: gridColor }
             }
           },
           plugins: {
             legend: {
               display: true,
-              labels: { color: '#9ca3af', font: { family: 'Outfit', size: 12 } }
+              labels: { color: tickColor, font: { family: 'Inter', size: 12, weight: '600' }, boxWidth: 12, usePointStyle: true }
             },
             tooltip: {
+              backgroundColor: isDark ? 'rgba(18, 22, 28, 0.96)' : 'rgba(13, 16, 23, 0.94)',
+              padding: 10,
+              cornerRadius: 8,
               callbacks: {
                 label: function(context) {
                   const t = timeline[context.dataIndex];
@@ -984,7 +1044,7 @@ const app = {
             <div class="symbol-cell" onclick="app.openTickerAnalysisModal('${p.symbol}')" style="cursor: pointer;" title="Haz clic para análisis 360° de ${p.symbol}">
               <div class="symbol-avatar">${p.symbol.substring(0, 3)}</div>
               <div>
-                <div class="symbol-name" style="color: #38bdf8; text-decoration: underline dotted;">${p.symbol} 🔍</div>
+                <div class="symbol-name" style="color: var(--accent-blue); text-decoration: underline dotted;">${p.symbol} 🔍</div>
                 <div class="symbol-sub">${p.original_name || p.symbol}</div>
               </div>
             </div>
@@ -994,8 +1054,8 @@ const app = {
           <td>$${p.buy_price.toFixed(2)}</td>
           <td>$${p.buy_total.toFixed(2)}</td>
           <td>
-            <strong style="color: #fff;">$${p.livePrice.toFixed(2)}</strong>
-            <span class="${p.change >= 0 ? 'text-success' : 'text-danger'}" style="font-size: 11px; margin-left: 4px;">
+            <strong style="color: var(--text-main);">$${p.livePrice.toFixed(2)}</strong>
+            <span class="${p.change >= 0 ? 'text-success' : 'text-danger'}" style="font-size: 11px; margin-left: 4px; font-weight: 700;">
               ${p.change >= 0 ? '+' : ''}${p.changePercent.toFixed(1)}%
             </span>
           </td>
@@ -1011,7 +1071,7 @@ const app = {
           <td>${p.daysHeld}d</td>
           <td>
             <div onclick="app.openForecastModal(${p.id})" style="cursor: pointer;" title="Haz clic para ver el análisis algorítmico completo">
-              <span class="${p.forecast.actionColor === 'danger' ? 'badge-down' : (p.forecast.actionColor === 'warning' ? 'badge-status status-open' : 'badge-up')}" style="font-size: 11px; padding: 4px 8px;">
+              <span class="${p.forecast.actionColor === 'danger' ? 'badge-down' : (p.forecast.actionColor === 'warning' ? 'badge-neutral' : 'badge-up')}" style="font-size: 11px; padding: 4px 8px;">
                 ${p.forecast.action === 'VENDER' ? '🔴 VENDER' : (p.forecast.action === 'ACUMULAR / MEJORAR' ? '🟡 ACUMULAR' : '🟢 MANTENER')}
               </span>
               <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px; font-weight: 600;">
@@ -1021,10 +1081,10 @@ const app = {
           </td>
           <td style="text-align: center;">
             <div style="display: flex; gap: 6px; justify-content: center;">
-              <button class="btn btn-success" style="padding: 6px 10px; font-weight: 700; font-size: 11px; box-shadow: 0 0 8px rgba(16,185,129,0.4);" onclick="app.openSellModal(${p.id}, '${p.symbol}', ${p.livePrice})">
+              <button class="btn btn-success" style="padding: 6px 10px; font-weight: 700; font-size: 11px;" onclick="app.openSellModal(${p.id}, '${p.symbol}', ${p.livePrice})">
                 💵 VENDER
               </button>
-              <button class="btn btn-secondary" style="padding: 6px 8px; font-size: 11px; color: #38bdf8;" onclick="app.openTickerAnalysisModal('${p.symbol}')" title="Análisis 360°">
+              <button class="btn btn-secondary" style="padding: 6px 8px; font-size: 11px; color: var(--accent-blue);" onclick="app.openTickerAnalysisModal('${p.symbol}')" title="Análisis 360°">
                 🔍
               </button>
               <button class="btn btn-secondary" style="padding: 6px 8px; font-size: 11px;" onclick="app.openForecastModal(${p.id})" title="Ver Pronóstico">
@@ -1055,9 +1115,9 @@ const app = {
         <tr>
           <td>
             <div class="symbol-cell" onclick="app.openTickerAnalysisModal('${p.symbol}')" style="cursor: pointer;" title="Haz clic para análisis 360° de ${p.symbol}">
-              <div class="symbol-avatar" style="background: rgba(255,255,255,0.05); color: #fff;">${p.symbol.substring(0, 3)}</div>
+              <div class="symbol-avatar">${p.symbol.substring(0, 3)}</div>
               <div>
-                <div class="symbol-name" style="color: #38bdf8; text-decoration: underline dotted;">${p.symbol} 🔍</div>
+                <div class="symbol-name" style="color: var(--accent-blue); text-decoration: underline dotted;">${p.symbol} 🔍</div>
                 <div class="symbol-sub">${p.original_name || p.symbol}</div>
               </div>
             </div>
@@ -1080,13 +1140,13 @@ const app = {
           <td>${p.days_held || 0}d</td>
           <td style="text-align: center;">
             <div style="display: flex; gap: 6px; justify-content: center;">
-              <button class="btn btn-secondary" style="padding: 5px 8px; font-size: 11px; color: #38bdf8;" onclick="app.openTickerAnalysisModal('${p.symbol}')" title="Análisis 360°">
+              <button class="btn btn-secondary" style="padding: 5px 8px; font-size: 11px; color: var(--accent-blue);" onclick="app.openTickerAnalysisModal('${p.symbol}')" title="Análisis 360°">
                 🔍
               </button>
               <button class="btn btn-secondary" style="padding: 5px 8px; font-size: 11px;" onclick="app.openEditClosedModal(${p.id})" title="Editar Venta">
                 ✏️
               </button>
-              <button class="btn btn-danger" style="padding: 5px 8px; font-size: 11px; background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.4); color: #f87171;" onclick="app.deleteTransaction(${p.id}, '${p.symbol}')" title="Eliminar Registro">
+              <button class="btn btn-danger" style="padding: 5px 8px; font-size: 11px; background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger);" onclick="app.deleteTransaction(${p.id}, '${p.symbol}')" title="Eliminar Registro">
                 🗑️
               </button>
             </div>
@@ -1812,24 +1872,24 @@ const app = {
             </div>
           </td>
           <td>
-            <div style="font-weight: 700; color: #fff;">$${(w.currentPrice || 0).toFixed(2)}</div>
+            <div style="font-weight: 700; color: var(--text-main);">$${(w.currentPrice || 0).toFixed(2)}</div>
             <div style="font-size: 11px;" class="${isUp ? 'stat-up' : 'stat-down'}">${isUp ? '+' : ''}${(w.changePercent || 0).toFixed(2)}%</div>
           </td>
           <td>
-            <span style="font-weight: 800; color: ${w.rsi < 35 ? '#60a5fa' : (w.rsi > 68 ? '#ef4444' : '#10b981')};">
+            <span style="font-weight: 800; color: ${w.rsi < 35 ? 'var(--accent-blue)' : (w.rsi > 68 ? 'var(--danger)' : 'var(--success)')};">
               RSI ${w.rsi || 50}
             </span>
           </td>
           <td>
             <div style="font-size: 11px; color: var(--text-muted);">
-              SMA 50: <strong style="color: #38bdf8;">$${w.sma50 || '-'}</strong><br>
-              SMA 200: <strong style="color: #a855f7;">$${w.sma200 || '-'}</strong>
+              SMA 50: <strong style="color: var(--accent-blue);">$${w.sma50 || '-'}</strong><br>
+              SMA 200: <strong style="color: #8b5cf6;">$${w.sma200 || '-'}</strong>
             </div>
           </td>
           <td>
             <div style="font-size: 11px; color: var(--text-muted);">
-              Soporte: <strong style="color: #10b981;">$${w.support || '-'}</strong><br>
-              Resistencia: <strong style="color: #ef4444;">$${w.resistance || '-'}</strong>
+              Soporte: <strong style="color: var(--success);">$${w.support || '-'}</strong><br>
+              Resistencia: <strong style="color: var(--danger);">$${w.resistance || '-'}</strong>
             </div>
           </td>
           <td>
