@@ -548,7 +548,7 @@ const app = {
     }
   },
 
-  intradayChartStyle: 'line', // 'line' o 'candle'
+  intradayChartStyle: 'step', // 'step' (Kalshi), 'line' (Curva) o 'candle' (Velas)
   currentTimeframe: '15m',    // '10m', '15m', '30m', '1d', '1w', '1m'
   showVolume: true,
 
@@ -593,7 +593,7 @@ const app = {
   },
 
   updateChartButtons() {
-    // 1. Selector único de temporalidad (solo uno activo a la vez)
+    // 1. Selector único de temporalidad inferior (solo uno activo a la vez)
     Object.keys(this.timeframeConfigs).forEach(tf => {
       const btn = document.getElementById(`btn-tf-${tf}`);
       if (btn) {
@@ -605,17 +605,14 @@ const app = {
       }
     });
 
-    // 2. Estilo (line, candle)
-    const btnLine = document.getElementById('btn-chart-style-line');
-    const btnCandle = document.getElementById('btn-chart-style-candle');
-    if (btnLine) {
-      if (this.intradayChartStyle === 'line') btnLine.classList.add('active');
-      else btnLine.classList.remove('active');
-    }
-    if (btnCandle) {
-      if (this.intradayChartStyle === 'candle') btnCandle.classList.add('active');
-      else btnCandle.classList.remove('active');
-    }
+    // 2. Estilo (step, line, candle)
+    ['step', 'line', 'candle'].forEach(st => {
+      const btn = document.getElementById(`btn-chart-style-${st}`);
+      if (btn) {
+        if (this.intradayChartStyle === st) btn.classList.add('active');
+        else btn.classList.remove('active');
+      }
+    });
 
     // 3. Volumen
     const btnVol = document.getElementById('btn-chart-volume');
@@ -631,6 +628,34 @@ const app = {
     if (badge) {
       const config = this.timeframeConfigs[this.currentTimeframe] || this.timeframeConfigs['15m'];
       badge.innerText = config.label;
+    }
+  },
+
+  updateIntradayKalshiHeader(symbol, currentPrice, basePrice, timeLabel) {
+    const titleEl = document.getElementById('kalshi-intraday-ticker-title');
+    const priceEl = document.getElementById('kalshi-live-price');
+    const deltaEl = document.getElementById('kalshi-live-delta');
+    const timeEl = document.getElementById('kalshi-hover-timestamp');
+    const dotEl = document.getElementById('kalshi-intraday-dot');
+
+    if (titleEl) titleEl.innerText = `${symbol} • EVOLUCIÓN DE MERCADO`;
+    if (priceEl) priceEl.innerText = `$${Number(currentPrice || 0).toFixed(2)}`;
+
+    const diff = (currentPrice || 0) - (basePrice || currentPrice || 1);
+    const pct = basePrice > 0 ? (diff / basePrice) * 100 : 0;
+    const isPos = diff >= 0;
+
+    if (deltaEl) {
+      const sign = isPos ? '+' : '';
+      deltaEl.innerText = `${isPos ? '▲ ' : '▼ '}${sign}$${diff.toFixed(2)} (${sign}${pct.toFixed(2)}%)`;
+      deltaEl.className = `kalshi-price-delta ${isPos ? 'pill-up' : 'pill-down'}`;
+    }
+    if (dotEl) {
+      dotEl.style.background = isPos ? 'var(--primary)' : 'var(--danger)';
+      dotEl.style.boxShadow = `0 0 8px ${isPos ? 'var(--primary)' : 'var(--danger)'}`;
+    }
+    if (timeEl) {
+      timeEl.innerText = timeLabel || 'En vivo (NY)';
     }
   },
 
@@ -675,17 +700,26 @@ const app = {
       const points = data.points || [];
       const labels = points.map(p => p.time);
       const volumes = points.map(p => p.volume || 0);
+      const prices = points.map(p => p.close || p.price);
+
+      const firstPrice = data.prevClose || (prices[0] || 100);
+      const lastPrice = data.currentPrice || (prices[prices.length - 1] || firstPrice);
+      const isPositive = lastPrice >= firstPrice;
+
+      // Inicializar el Header estilo Kalshi con el precio en vivo actual
+      this.updateIntradayKalshiHeader(symbol, lastPrice, firstPrice, `En vivo • ${points[points.length - 1]?.time || ''} NY`);
 
       const maxVol = Math.max(...volumes, 1);
       const isDark = document.body.classList.contains('dark-theme');
       const greenHex = isDark ? '#28CC95' : '#00B87C';
       const redHex = isDark ? '#F24E4E' : '#E53935';
+      const strokeColor = isPositive ? greenHex : redHex;
 
-      const volColors = points.map(p => p.close >= p.open ? 'rgba(0, 184, 124, 0.25)' : 'rgba(229, 57, 53, 0.25)');
+      const volColors = points.map(p => p.close >= p.open ? 'rgba(0, 184, 124, 0.22)' : 'rgba(229, 57, 53, 0.22)');
 
       if (this.charts.intraday) this.charts.intraday.destroy();
 
-      const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(13, 16, 23, 0.05)';
+      const gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(13, 16, 23, 0.06)';
       const tickColor = isDark ? '#8A94A6' : '#5A6577';
 
       const datasets = [];
@@ -701,23 +735,19 @@ const app = {
           yAxisID: 'y'
         });
       } else {
-        const prices = points.map(p => p.close || p.price);
-        const firstPrice = data.prevClose || (prices[0] || 100);
-        const lastPrice = data.currentPrice || (prices[prices.length - 1] || firstPrice);
-        const isPositive = lastPrice >= firstPrice;
-
-        const strokeColor = isPositive ? greenHex : redHex;
-        const bgGradient = ctx.createLinearGradient(0, 0, 0, 280);
+        const bgGradient = ctx.createLinearGradient(0, 0, 0, 290);
         if (isPositive) {
-          bgGradient.addColorStop(0, isDark ? 'rgba(40, 204, 149, 0.24)' : 'rgba(0, 184, 124, 0.18)');
+          bgGradient.addColorStop(0, isDark ? 'rgba(40, 204, 149, 0.28)' : 'rgba(0, 184, 124, 0.22)');
+          bgGradient.addColorStop(0.75, isDark ? 'rgba(40, 204, 149, 0.04)' : 'rgba(0, 184, 124, 0.03)');
           bgGradient.addColorStop(1, 'rgba(0, 184, 124, 0.0)');
         } else {
-          bgGradient.addColorStop(0, isDark ? 'rgba(242, 78, 78, 0.24)' : 'rgba(229, 57, 53, 0.16)');
+          bgGradient.addColorStop(0, isDark ? 'rgba(242, 78, 78, 0.28)' : 'rgba(229, 57, 53, 0.20)');
+          bgGradient.addColorStop(0.75, isDark ? 'rgba(242, 78, 78, 0.04)' : 'rgba(229, 57, 53, 0.03)');
           bgGradient.addColorStop(1, 'rgba(229, 57, 53, 0.0)');
         }
 
-        // Estilo Kalshi: Línea nítida sin puntos intermedios, solo punto final luminoso
-        const pointRadii = prices.map((_, idx) => (idx === prices.length - 1 ? 4.5 : 0));
+        const isStep = this.intradayChartStyle === 'step';
+        const pointRadii = prices.map((_, idx) => (idx === prices.length - 1 ? 5 : 0));
 
         datasets.push({
           type: 'line',
@@ -727,20 +757,20 @@ const app = {
           borderWidth: 2.5,
           backgroundColor: bgGradient,
           fill: true,
-          tension: 0.28,
+          stepped: isStep ? 'before' : false,
+          tension: isStep ? 0 : 0.25,
           pointBackgroundColor: strokeColor,
           pointBorderColor: isDark ? '#12161C' : '#FFFFFF',
-          pointBorderWidth: 2,
+          pointBorderWidth: 2.5,
           pointRadius: pointRadii,
-          pointHoverRadius: 6,
+          pointHoverRadius: 6.5,
           pointHoverBackgroundColor: strokeColor,
           pointHoverBorderColor: '#FFFFFF',
-          pointHoverBorderWidth: 2,
+          pointHoverBorderWidth: 2.5,
           yAxisID: 'y'
         });
       }
 
-      // Dataset de Volumen de Acciones Transadas (Si está activo)
       if (this.showVolume) {
         datasets.push({
           type: 'bar',
@@ -749,15 +779,17 @@ const app = {
           backgroundColor: volColors,
           borderColor: 'transparent',
           borderRadius: 2,
+          barPercentage: 0.7,
+          categoryPercentage: 0.85,
           yAxisID: 'yVolume'
         });
       }
 
       const allLows = points.map(p => p.low || p.price);
       const allHighs = points.map(p => p.high || p.price);
-      const minPrice = Math.min(...allLows);
-      const maxPrice = Math.max(...allHighs);
-      const padding = (maxPrice - minPrice) * 0.06 || 1.0;
+      const minPrice = Math.min(...allLows, firstPrice);
+      const maxPrice = Math.max(...allHighs, firstPrice);
+      const padding = (maxPrice - minPrice) * 0.08 || 1.0;
 
       const yMin = Math.floor((minPrice - padding) * 100) / 100;
       const yMax = Math.ceil((maxPrice + padding) * 100) / 100;
@@ -765,9 +797,26 @@ const app = {
       const kalshiChartPlugin = {
         id: 'kalshiChartPlugin',
         beforeDatasetsDraw(chart) {
+          const { ctx, chartArea, scales: { x, y } } = chart;
+          if (!chartArea) return;
+
+          // 1. Línea de Referencia Punteada del Cierre Anterior (Estilo Kalshi Baseline)
+          if (firstPrice >= yMin && firstPrice <= yMax) {
+            const baseY = y.getPixelForValue(firstPrice);
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(chartArea.left, baseY);
+            ctx.lineTo(chartArea.right, baseY);
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 5]);
+            ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(13, 16, 23, 0.18)';
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          // 2. Renderizado de Velas si está en modo Velas
           if (app.intradayChartStyle !== 'candle') return;
-          const { ctx, scales: { x, y } } = chart;
-          const candleWidth = Math.max(4, Math.min(12, Math.floor((chart.chartArea.width / Math.max(points.length, 1)) * 0.6)));
+          const candleWidth = Math.max(4, Math.min(12, Math.floor((chartArea.width / Math.max(points.length, 1)) * 0.6)));
           points.forEach((p, i) => {
             const xPos = x.getPixelForValue(i);
             const highY = y.getPixelForValue(p.high);
@@ -793,24 +842,51 @@ const app = {
             ctx.restore();
           });
         },
+        afterDatasetsDraw(chart) {
+          const { ctx, chartArea, scales: { x, y } } = chart;
+          if (!chartArea || points.length === 0) return;
+
+          // Halo Luminoso en el último punto en vivo (Kalshi Live Endpoint Glow)
+          if (app.intradayChartStyle !== 'candle') {
+            const lastIdx = points.length - 1;
+            const lastX = x.getPixelForValue(lastIdx);
+            const lastY = y.getPixelForValue(points[lastIdx].close);
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(lastX, lastY, 10, 0, Math.PI * 2);
+            ctx.fillStyle = isPositive ? 'rgba(0, 184, 124, 0.22)' : 'rgba(229, 57, 53, 0.22)';
+            ctx.fill();
+            ctx.restore();
+          }
+        },
         afterDraw(chart) {
-          // Línea guía vertical (Crosshair estilo Kalshi) al pasar el mouse
+          // Crosshair Vertical + Actualización en Tiempo Real del Header Kalshi al pasar el mouse
           if (chart.tooltip?._active?.length) {
             const activePoint = chart.tooltip._active[0];
+            const idx = activePoint.index;
+            const p = points[idx];
             const ctx = chart.ctx;
-            const x = activePoint.element.x;
+            const xPos = activePoint.element.x;
             const topY = chart.scales.y.top;
             const bottomY = chart.scales.y.bottom;
 
             ctx.save();
             ctx.beginPath();
-            ctx.moveTo(x, topY);
-            ctx.lineTo(x, bottomY);
-            ctx.lineWidth = 1;
+            ctx.moveTo(xPos, topY);
+            ctx.lineTo(xPos, bottomY);
+            ctx.lineWidth = 1.2;
             ctx.setLineDash([4, 4]);
-            ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(13, 16, 23, 0.25)';
+            ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(13, 16, 23, 0.35)';
             ctx.stroke();
             ctx.restore();
+
+            if (p) {
+              app.updateIntradayKalshiHeader(symbol, p.close, firstPrice, `🕒 ${p.time} NY • Vol: ${(p.volume || 0).toLocaleString('es-ES')}`);
+            }
+          } else {
+            // Al sacar el cursor del gráfico, vuelve al precio en vivo actual
+            app.updateIntradayKalshiHeader(symbol, lastPrice, firstPrice, `En vivo • ${points[points.length - 1]?.time || ''} NY`);
           }
         }
       };
@@ -832,8 +908,8 @@ const app = {
               border: { display: false },
               ticks: {
                 color: tickColor,
-                maxTicksLimit: 8,
-                font: { family: 'Inter', size: 11, weight: '500' }
+                maxTicksLimit: 7,
+                font: { family: 'Inter', size: 11, weight: '600' }
               },
               grid: { display: false }
             },
@@ -845,12 +921,13 @@ const app = {
               border: { display: false },
               ticks: {
                 color: tickColor,
+                maxTicksLimit: 6,
                 font: { family: 'JetBrains Mono, Inter', size: 11, weight: '600' },
                 callback: function(v) { return '$' + v.toFixed(2); }
               },
               grid: {
                 color: gridColor,
-                borderDash: [4, 4]
+                borderDash: [3, 3]
               }
             },
             yVolume: {
@@ -858,7 +935,7 @@ const app = {
               position: 'left',
               display: false,
               min: 0,
-              max: maxVol * 4.2
+              max: maxVol * 4.5
             }
           },
           plugins: {
@@ -866,28 +943,31 @@ const app = {
             tooltip: {
               backgroundColor: isDark ? 'rgba(18, 22, 28, 0.96)' : 'rgba(13, 16, 23, 0.94)',
               titleFont: { family: 'Inter', size: 11, weight: '700' },
-              bodyFont: { family: 'Inter', size: 12, weight: '600' },
+              bodyFont: { family: 'JetBrains Mono, Inter', size: 12, weight: '600' },
               padding: 10,
               cornerRadius: 8,
               displayColors: false,
               callbacks: {
+                title: function(items) {
+                  if (!items.length) return '';
+                  return `${symbol} • ${items[0].label} (NY)`;
+                },
                 label: function(context) {
                   const p = points[context.dataIndex];
-                  const volStr = p.volume ? p.volume.toLocaleString('es-ES') + ' acc' : '0 acc';
+                  const volStr = p.volume ? p.volume.toLocaleString('es-ES') : '0';
                   if (app.intradayChartStyle === 'candle') {
                     if (context.datasetIndex === 0) {
                       return [
-                        `🕒 ${p.time} (NY)`,
-                        `Apertura: $${p.open.toFixed(2)}  |  Cierre: $${p.close.toFixed(2)}`,
-                        `Máx: $${p.high.toFixed(2)}  |  Mín: $${p.low.toFixed(2)}`,
-                        `Volumen: ${volStr}`
+                        `O: $${p.open.toFixed(2)}   C: $${p.close.toFixed(2)}`,
+                        `H: $${p.high.toFixed(2)}   L: $${p.low.toFixed(2)}`,
+                        `Vol: ${volStr} acc`
                       ];
                     }
                   } else {
                     if (context.datasetIndex === 0) {
                       return [
                         `Precio: $${p.close.toFixed(2)}`,
-                        `Volumen: ${volStr}`
+                        `Volumen: ${volStr} acc`
                       ];
                     }
                   }
@@ -908,6 +988,21 @@ const app = {
   // ==========================================
   // GRÁFICO HISTÓRICO DE VALOR TOTAL DE CARTERA VS TIEMPO (ESTILO KALSHI)
   // ==========================================
+  updateHistoricalKalshiHeader(totalVal, netGain, dateLabel) {
+    const valEl = document.getElementById('kalshi-hist-total-val');
+    const gainEl = document.getElementById('kalshi-hist-net-gain');
+    const dateEl = document.getElementById('kalshi-hist-hover-date');
+
+    if (valEl) valEl.innerText = `$${Number(totalVal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    if (gainEl) {
+      const isPos = (netGain || 0) >= 0;
+      const sign = isPos ? '+' : '';
+      gainEl.innerText = `${isPos ? '▲ ' : '▼ '}${sign}$${Number(netGain || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} Realizado`;
+      gainEl.className = `kalshi-price-delta ${isPos ? 'pill-up' : 'pill-down'}`;
+    }
+    if (dateEl) dateEl.innerText = dateLabel || 'Histórico Completo';
+  },
+
   async fetchAndRenderHistoricalChart() {
     const canvas = document.getElementById('chart-historical-line');
     if (!canvas) return;
@@ -927,18 +1022,53 @@ const app = {
       const totalValues = timeline.map(t => t.totalValue);
       const investedValues = timeline.map(t => t.invested);
 
+      const lastItem = timeline[timeline.length - 1];
+      this.updateHistoricalKalshiHeader(lastItem.totalValue, lastItem.netGain, `Actualizado • ${lastItem.date}`);
+
       const isDark = document.body.classList.contains('dark-theme');
       const greenHex = isDark ? '#28CC95' : '#00B87C';
-      const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(13, 16, 23, 0.05)';
+      const gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(13, 16, 23, 0.06)';
       const tickColor = isDark ? '#8A94A6' : '#5A6577';
 
-      const bgGradient = ctx.createLinearGradient(0, 0, 0, 280);
-      bgGradient.addColorStop(0, isDark ? 'rgba(40, 204, 149, 0.25)' : 'rgba(0, 184, 124, 0.18)');
+      const bgGradient = ctx.createLinearGradient(0, 0, 0, 290);
+      bgGradient.addColorStop(0, isDark ? 'rgba(40, 204, 149, 0.28)' : 'rgba(0, 184, 124, 0.22)');
+      bgGradient.addColorStop(0.8, isDark ? 'rgba(40, 204, 149, 0.03)' : 'rgba(0, 184, 124, 0.02)');
       bgGradient.addColorStop(1, 'rgba(0, 184, 124, 0.0)');
 
       if (this.charts.historical) this.charts.historical.destroy();
 
-      const pointRadii = totalValues.map((_, idx) => (idx === totalValues.length - 1 ? 4.5 : 0));
+      const pointRadii = totalValues.map((_, idx) => (idx === totalValues.length - 1 ? 5 : 0));
+
+      const kalshiHistPlugin = {
+        id: 'kalshiHistPlugin',
+        afterDraw(chart) {
+          if (chart.tooltip?._active?.length) {
+            const activePoint = chart.tooltip._active[0];
+            const idx = activePoint.index;
+            const t = timeline[idx];
+            const ctx = chart.ctx;
+            const xPos = activePoint.element.x;
+            const topY = chart.scales.y.top;
+            const bottomY = chart.scales.y.bottom;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(xPos, topY);
+            ctx.lineTo(xPos, bottomY);
+            ctx.lineWidth = 1.2;
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(13, 16, 23, 0.35)';
+            ctx.stroke();
+            ctx.restore();
+
+            if (t) {
+              app.updateHistoricalKalshiHeader(t.totalValue, t.netGain, `📅 Fecha: ${t.date}`);
+            }
+          } else {
+            app.updateHistoricalKalshiHeader(lastItem.totalValue, lastItem.netGain, `Actualizado • ${lastItem.date}`);
+          }
+        }
+      };
 
       this.charts.historical = new Chart(ctx, {
         type: 'line',
@@ -952,12 +1082,12 @@ const app = {
               borderWidth: 2.5,
               backgroundColor: bgGradient,
               fill: true,
-              tension: 0.28,
+              stepped: 'before',
               pointBackgroundColor: greenHex,
               pointBorderColor: isDark ? '#12161C' : '#FFFFFF',
-              pointBorderWidth: 2,
+              pointBorderWidth: 2.5,
               pointRadius: pointRadii,
-              pointHoverRadius: 6
+              pointHoverRadius: 6.5
             },
             {
               label: 'Capital Invertido US$',
@@ -967,7 +1097,7 @@ const app = {
               borderDash: [5, 5],
               backgroundColor: 'transparent',
               fill: false,
-              tension: 0.15,
+              stepped: 'before',
               pointRadius: 0,
               pointHoverRadius: 4
             }
@@ -983,7 +1113,7 @@ const app = {
           scales: {
             x: {
               border: { display: false },
-              ticks: { color: tickColor, font: { family: 'Inter', size: 11, weight: '500' } },
+              ticks: { color: tickColor, font: { family: 'Inter', size: 11, weight: '600' } },
               grid: { display: false }
             },
             y: {
@@ -994,7 +1124,7 @@ const app = {
                 font: { family: 'JetBrains Mono, Inter', size: 11, weight: '600' },
                 callback: function(v) { return '$' + v.toLocaleString('en-US'); }
               },
-              grid: { color: gridColor }
+              grid: { color: gridColor, borderDash: [3, 3] }
             }
           },
           plugins: {
@@ -1012,16 +1142,17 @@ const app = {
                   if (context.datasetIndex === 0) {
                     const gainSign = t.netGain >= 0 ? '+' : '';
                     return [
-                      `Valor Total Cartera: $${t.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-                      `Ganancia Acumulada Real: ${gainSign}$${t.netGain.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                      `Valor Cartera: $${t.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+                      `Ganancia Real: ${gainSign}$${t.netGain.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
                     ];
                   }
-                  return `Capital Invertido: $${t.invested.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                  return `Invertido: $${t.invested.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
                 }
               }
             }
           }
-        }
+        },
+        plugins: [kalshiHistPlugin]
       });
     } catch (err) {
       console.error('Error renderizando gráfico histórico de cartera:', err);

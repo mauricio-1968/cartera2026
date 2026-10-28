@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   
   <!-- CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=2.8.0">
+  <link rel="stylesheet" href="/css/styles.css?v=2.9.0">
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -159,71 +159,87 @@
 
       <!-- Dashboard Layout de Ancho Completo -->
       <div class="dashboard-full-width">
-        <!-- CARD 1: GRÁFICO DINÁMICO DE EVOLUCIÓN DE PRECIO Y VOLUMEN -->
-        <div class="card" style="margin-bottom: 24px;">
-          <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span>📈 Evolución del Precio y Volumen</span>
-              <span id="chart-info-badge" style="font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--primary-light); color: var(--primary); border: 1px solid var(--success-border);">1 Día • 15m</span>
+        <!-- CARD 1: GRÁFICO INTERACTIVO ESTILO KALSHI (PRECIO Y VOLUMEN) -->
+        <div class="card kalshi-chart-card" style="margin-bottom: 24px;">
+          <!-- Header Superior Estilo Kalshi Event Header -->
+          <div class="kalshi-chart-header">
+            <div class="kalshi-chart-title-group">
+              <div class="kalshi-eyebrow">
+                <span class="kalshi-live-dot" id="kalshi-intraday-dot"></span>
+                <span id="kalshi-intraday-ticker-title">TSLA • EVOLUCIÓN DE MERCADO</span>
+                <span id="chart-info-badge" class="kalshi-tf-badge">15 Minutos</span>
+              </div>
+              <div class="kalshi-price-hero-row">
+                <span class="kalshi-big-price" id="kalshi-live-price">$0.00</span>
+                <span class="kalshi-price-delta pill-up" id="kalshi-live-delta">+0.00 (+0.00%)</span>
+                <span class="kalshi-hover-time" id="kalshi-hover-timestamp">En vivo</span>
+              </div>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-              <!-- Selector Único de Temporalidad (10m, 15m, 30m, 1 Día, 1 Semana, 1 Mes) -->
-              <div style="display: flex; background: var(--bg-dark); border-radius: 8px; padding: 2px; border: 1px solid var(--border-color);" title="Seleccionar Temporalidad">
-                <button type="button" id="btn-tf-10m" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setTimeframe('10m')">
-                  10m
-                </button>
-                <button type="button" id="btn-tf-15m" class="btn btn-secondary btn-chart-opt active" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setTimeframe('15m')">
-                  15m
-                </button>
-                <button type="button" id="btn-tf-30m" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setTimeframe('30m')">
-                  30m
-                </button>
-                <button type="button" id="btn-tf-1d" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setTimeframe('1d')">
-                  1 Día
-                </button>
-                <button type="button" id="btn-tf-1w" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setTimeframe('1w')">
-                  1 Sem
-                </button>
-                <button type="button" id="btn-tf-1m" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setTimeframe('1m')">
-                  1 Mes
-                </button>
-              </div>
-
-              <!-- Selector de Estilo de Gráfico -->
-              <div style="display: flex; background: var(--bg-dark); border-radius: 8px; padding: 2px; border: 1px solid var(--border-color);">
-                <button type="button" id="btn-chart-style-line" class="btn btn-secondary btn-chart-opt active" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartStyle('line')">
-                  📈 Línea
-                </button>
-                <button type="button" id="btn-chart-style-candle" class="btn btn-secondary btn-chart-opt" style="padding: 4px 9px; font-size: 11px; border-radius: 6px;" onclick="app.setChartStyle('candle')">
-                  🕯️ Velas
-                </button>
-                <button type="button" id="btn-chart-volume" class="btn btn-secondary btn-chart-opt active" style="padding: 4px 9px; font-size: 11px; border-radius: 6px; margin-left: 2px;" onclick="app.toggleVolume()">
-                  📊 Vol (<span id="volume-status-text">ON</span>)
-                </button>
-              </div>
-
-              <!-- Selector de Acción -->
-              <div style="display: flex; align-items: center; gap: 5px;">
-                <label style="font-size: 11px; color: var(--text-muted); font-weight: 700;">Acción:</label>
-                <select id="chart-stock-select" class="form-input" style="padding: 4px 10px; font-size: 12px; width: auto; font-weight: 800;" onchange="app.changeIntradaySymbol(this.value)">
+            <!-- Controles Superiores Derecha (Selector de Acción y Estilo) -->
+            <div class="kalshi-chart-top-controls">
+              <div class="kalshi-select-wrapper">
+                <label class="kalshi-select-label">ACCIÓN</label>
+                <select id="chart-stock-select" class="kalshi-ticker-select" onchange="app.changeIntradaySymbol(this.value)">
                   <!-- Opciones dinámicas -->
                 </select>
               </div>
+
+              <!-- Selector de Estilo de Gráfico (Escalón Kalshi / Curva / Velas / Vol) -->
+              <div class="kalshi-style-pill-group">
+                <button type="button" id="btn-chart-style-step" class="btn-kalshi-style active" onclick="app.setChartStyle('step')" title="Línea Escalonada estilo Kalshi">
+                  ⚡ Kalshi
+                </button>
+                <button type="button" id="btn-chart-style-line" class="btn-kalshi-style" onclick="app.setChartStyle('line')" title="Línea Suave">
+                  📈 Curva
+                </button>
+                <button type="button" id="btn-chart-style-candle" class="btn-kalshi-style" onclick="app.setChartStyle('candle')" title="Velas Japonesas">
+                  🕯️ Velas
+                </button>
+                <button type="button" id="btn-chart-volume" class="btn-kalshi-style active" onclick="app.toggleVolume()" title="Mostrar/Ocultar Volumen">
+                  📊 Vol (<span id="volume-status-text">ON</span>)
+                </button>
+              </div>
             </div>
           </div>
-          <div class="chart-container">
+
+          <!-- Lienzo del Gráfico Kalshi -->
+          <div class="chart-container kalshi-canvas-wrap">
             <canvas id="chart-intraday-line"></canvas>
+          </div>
+
+          <!-- Barra Inferior de Temporalidad Estilo Kalshi (LIVE / 10M / 15M / 30M / 1D / 1W / 1M) -->
+          <div class="kalshi-chart-footer">
+            <div class="kalshi-timeframe-bar" title="Seleccionar Temporalidad">
+              <button type="button" id="btn-tf-10m" class="kalshi-tf-btn" onclick="app.setTimeframe('10m')">10M</button>
+              <button type="button" id="btn-tf-15m" class="kalshi-tf-btn active" onclick="app.setTimeframe('15m')">15M</button>
+              <button type="button" id="btn-tf-30m" class="kalshi-tf-btn" onclick="app.setTimeframe('30m')">30M</button>
+              <button type="button" id="btn-tf-1d" class="kalshi-tf-btn" onclick="app.setTimeframe('1d')">1D</button>
+              <button type="button" id="btn-tf-1w" class="kalshi-tf-btn" onclick="app.setTimeframe('1w')">1S</button>
+              <button type="button" id="btn-tf-1m" class="kalshi-tf-btn" onclick="app.setTimeframe('1m')">1M</button>
+            </div>
+            <div class="kalshi-chart-watermark">
+              <span>KALSHI ENGINE • DATOS EN VIVO</span>
+            </div>
           </div>
         </div>
 
-        <!-- CARD 2: GRÁFICO DE EVOLUCIÓN HISTÓRICA (VALOR TOTAL VS TIEMPO) -->
-        <div class="card" style="margin-bottom: 24px;">
-          <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>📈 Evolución Histórica de la Cartera (Valor Total vs Tiempo)</span>
-            <span style="font-size: 11px; font-weight: normal; color: var(--success);">Ganancia / Pérdida Acumulada Real</span>
+        <!-- CARD 2: GRÁFICO HISTÓRICO DE LA CARTERA ESTILO KALSHI -->
+        <div class="card kalshi-chart-card" style="margin-bottom: 24px;">
+          <div class="kalshi-chart-header">
+            <div class="kalshi-chart-title-group">
+              <div class="kalshi-eyebrow">
+                <span class="kalshi-live-dot"></span>
+                <span>VALOR TOTAL DE LA CARTERA VS TIEMPO</span>
+              </div>
+              <div class="kalshi-price-hero-row">
+                <span class="kalshi-big-price" id="kalshi-hist-total-val">$0.00</span>
+                <span class="kalshi-price-delta pill-up" id="kalshi-hist-net-gain">+$0.00 Acumulado</span>
+                <span class="kalshi-hover-time" id="kalshi-hist-hover-date">Histórico Completo</span>
+              </div>
+            </div>
           </div>
-          <div class="chart-container">
+          <div class="chart-container kalshi-canvas-wrap">
             <canvas id="chart-historical-line"></canvas>
           </div>
         </div>
@@ -1098,6 +1114,6 @@
   </div>
 
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=2.8.0"></script>
+  <script src="/js/app.js?v=2.9.0"></script>
 </body>
 </html>
