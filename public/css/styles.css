@@ -1433,6 +1433,159 @@ body.dark-theme .btn-card-buy:hover {
 }
 
 /* ==========================================================
+   RACIONAL PREMIUM (CHILE) - SEÑALES OPERATIVAS DIRECTAS
+   ========================================================== */
+.racional-command-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-xs);
+}
+
+.racional-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.racional-logo-badge {
+  font-family: var(--font-condensed);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--text-main);
+  color: var(--bg-card);
+}
+
+.racional-bar-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.racional-filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.racional-filter-btn {
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface-elevated);
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.racional-filter-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--text-muted);
+}
+
+.racional-filter-btn.active {
+  background: var(--text-main);
+  color: var(--bg-card);
+  border-color: var(--text-main);
+}
+
+.racional-filter-btn.rac-buy.active {
+  background: #0AC285;
+  color: #FFFFFF;
+  border-color: #0AC285;
+}
+
+.racional-filter-btn.rac-sell.active {
+  background: #E53935;
+  color: #FFFFFF;
+  border-color: #E53935;
+}
+
+.racional-filter-btn.rac-hold.active {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #2563EB;
+}
+
+.racional-card-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 11px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.racional-card-banner:hover {
+  transform: scale(1.01);
+}
+
+.racional-card-banner.rac-banner-buy {
+  background: var(--success-bg);
+  border: 1.5px solid rgba(10, 194, 133, 0.45);
+}
+
+.racional-card-banner.rac-banner-sell {
+  background: var(--danger-bg);
+  border: 1.5px solid rgba(217, 45, 32, 0.45);
+}
+
+.racional-card-banner.rac-banner-hold {
+  background: rgba(37, 99, 235, 0.10);
+  border: 1.5px solid rgba(37, 99, 235, 0.35);
+}
+
+.racional-action-title {
+  font-family: var(--font-condensed);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.rac-banner-buy .racional-action-title {
+  color: var(--primary-hover);
+}
+
+.rac-banner-sell .racional-action-title {
+  color: var(--danger);
+}
+
+.rac-banner-hold .racional-action-title {
+  color: var(--accent-blue);
+}
+
+.racional-action-sub {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.racional-instruction-box {
+  background: var(--primary-light);
+  border: 1.5px solid rgba(10, 194, 133, 0.4);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+/* ==========================================================
    RESPONSIVE DESIGN (PC, TABLET & MOBILE)
    ========================================================== */
 @media (max-width: 900px) {

@@ -395,37 +395,37 @@ async function getTechnicalAnalysis(symbol) {
       const rewardPerShare = Math.max(0.01, atrTakeProfit - currentPrice);
       const riskRewardRatio = Number((rewardPerShare / riskPerShare).toFixed(2));
 
-      // Generar Indicador de Decisión Táctica
-      let decision = 'ESPERAR'; // ESPERAR, COMPRAR, VENDER, REBOTE
-      let decisionBadge = '🟡 ESPERAR / NEUTRAL';
-      let decisionColor = 'warning';
-      let reason = 'El precio cotiza en rango neutro sin señales de ruptura inminente.';
+      // Generar Indicador de Decisión Táctica estandarizado para operar en Racional ("COMPRAR+", "VENDER", "MANTENER POSICIÓN")
+      let decision = 'MANTENER POSICIÓN';
+      let decisionBadge = '🔵 RACIONAL: MANTENER POSICIÓN';
+      let decisionColor = 'info';
+      let reason = `El precio cotiza en rango de consolidación (Prob. Alcista Kalshi ${kalshiProb}%). En Racional: mantener posición actual o esperar confirmación sobre $${sma20}.`;
       let riskLevel = atrData.atrPercent > 4.2 ? 'Alto' : atrData.atrPercent > 2.2 ? 'Medio' : 'Bajo';
 
       const distToSupportPercent = support > 0 ? ((currentPrice - support) / support) * 100 : 5;
 
-      if (rsi < 32) {
-        decision = 'REBOTE';
-        decisionBadge = '🔵 ALERTA REBOTE (SOBREVENTA)';
-        decisionColor = 'info';
-        reason = `RSI en sobreventa (${rsi}) con ATR diario de $${atrData.atr}. Alta probabilidad (${kalshiProb}%) de rebote técnico hacia $${sma20} desde el soporte de $${support}.`;
-      } else if (rsi > 72 || kalshiProb <= 32) {
+      if (rsi < 34) {
+        decision = 'COMPRAR+';
+        decisionBadge = '🟢 RACIONAL: COMPRAR+ (REBOTE)';
+        decisionColor = 'success';
+        reason = `RSI en sobreventa (${rsi}) con ATR diario de $${atrData.atr}. Alta probabilidad (${kalshiProb}%) de rebote técnico hacia $${sma20} desde el soporte de $${support}. Excelente zona para ejecutar "Comprar+" en Racional.`;
+      } else if (rsi > 71 || kalshiProb <= 36) {
         decision = 'VENDER';
-        decisionBadge = rsi > 72 ? '🔴 VENDER / SOBRECOMPRA' : '🔴 EVITAR / DEBILIDAD TÉCNICA';
+        decisionBadge = '🔴 RACIONAL: VENDER';
         decisionColor = 'danger';
-        reason = rsi > 72
-          ? `RSI en sobrecompra (${rsi}) cerca de resistencia ($${resistance}). Probabilidad alcista reducida a ${kalshiProb}%.`
-          : `Estructura técnica débil (Prob. Alcista ${kalshiProb}%, MACD: ${macd.state}). Cotizando bajo medias clave.`;
-      } else if (kalshiProb >= 66 || (currentPrice > sma50 && sma50 > sma200 && rsi >= 45 && rsi <= 65)) {
-        decision = 'COMPRAR';
-        decisionBadge = '🟢 COMPRAR / SWING ALCISTA';
+        reason = rsi > 71
+          ? `RSI en sobrecompra (${rsi}) cerca de resistencia ($${resistance}). En Racional: ejecutar "Vender" para asegurar ganancias.`
+          : `Estructura técnica débil (Prob. Alcista ${kalshiProb}%, MACD: ${macd.state}). En Racional: ejecutar "Vender" o evitar compras hasta recuperar SMA50 ($${sma50}).`;
+      } else if (kalshiProb >= 64 || (currentPrice > sma50 && sma50 > sma200 && rsi >= 45 && rsi <= 65)) {
+        decision = 'COMPRAR+';
+        decisionBadge = '🟢 RACIONAL: COMPRAR+';
         decisionColor = 'success';
-        reason = `Confluencia alcista (${kalshiProb}% Prob. Kalshi, MACD ${macd.state}, RVOL ${volumeRatio}x). Objetivo técnico en $${atrTakeProfit} con Stop dinámico en $${atrStopLoss} (R/R 1:${riskRewardRatio}).`;
-      } else if (distToSupportPercent <= 2.8 && rsi < 52) {
-        decision = 'COMPRAR';
-        decisionBadge = '🟢 ACUMULAR EN SOPORTE';
+        reason = `Confluencia alcista (${kalshiProb}% Prob. Kalshi, MACD ${macd.state}, RVOL ${volumeRatio}x). En Racional: ejecutar "Comprar+" buscando objetivo en $${atrTakeProfit} con Stop en $${atrStopLoss} (R/R 1:${riskRewardRatio}).`;
+      } else if (distToSupportPercent <= 3.0 && rsi < 54) {
+        decision = 'COMPRAR+';
+        decisionBadge = '🟢 RACIONAL: COMPRAR+ (SOPORTE)';
         decisionColor = 'success';
-        reason = `Precio defendiendo soporte clave ($${support}). Excelente asimetría Riesgo/Beneficio (1:${riskRewardRatio}) hacia $${atrTakeProfit}.`;
+        reason = `Precio defendiendo soporte clave ($${support}). En Racional: ejecutar "Comprar+" para promediar con relación Riesgo/Beneficio 1:${riskRewardRatio} hacia $${atrTakeProfit}.`;
       }
 
       const analysisData = {

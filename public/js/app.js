@@ -345,11 +345,51 @@ const app = {
     }
   },
 
+  activeRacionalFilter: 'ALL',
+
+  filterCardsByRacional(actionType) {
+    this.activeRacionalFilter = actionType || 'ALL';
+    const mapBtn = {
+      'ALL': 'btn-rac-all',
+      'COMPRAR+': 'btn-rac-buy',
+      'VENDER': 'btn-rac-sell',
+      'MANTENER POSICIÓN': 'btn-rac-hold'
+    };
+    Object.keys(mapBtn).forEach(k => {
+      const btn = document.getElementById(mapBtn[k]);
+      if (btn) {
+        if (k === this.activeRacionalFilter) btn.classList.add('active');
+        else btn.classList.remove('active');
+      }
+    });
+    if (this.data && this.data.openPositions) {
+      this.renderOpenPositionsCards(this.data.openPositions);
+    }
+  },
+
   renderOpenPositionsCards(openPositions) {
     const grid = document.getElementById('holdings-cards-grid');
     const badge = document.getElementById('badge-holdings-count');
     if (badge) badge.innerText = `${openPositions ? openPositions.length : 0} activas`;
     if (!grid) return;
+
+    const allList = openPositions || [];
+    let countBuy = 0, countSell = 0, countHold = 0;
+    allList.forEach(p => {
+      const rAct = (p.forecast && p.forecast.racionalAction) ? p.forecast.racionalAction : 'MANTENER POSICIÓN';
+      if (rAct === 'COMPRAR+') countBuy++;
+      else if (rAct === 'VENDER') countSell++;
+      else countHold++;
+    });
+
+    const elAll = document.getElementById('rac-count-all');
+    const elBuy = document.getElementById('rac-count-buy');
+    const elSell = document.getElementById('rac-count-sell');
+    const elHold = document.getElementById('rac-count-hold');
+    if (elAll) elAll.innerText = allList.length;
+    if (elBuy) elBuy.innerText = countBuy;
+    if (elSell) elSell.innerText = countSell;
+    if (elHold) elHold.innerText = countHold;
 
     if (!openPositions || openPositions.length === 0) {
       grid.innerHTML = `
@@ -360,8 +400,22 @@ const app = {
       return;
     }
 
+    const filteredPositions = this.activeRacionalFilter === 'ALL'
+      ? allList
+      : allList.filter(p => ((p.forecast && p.forecast.racionalAction) || 'MANTENER POSICIÓN') === this.activeRacionalFilter);
+
+    if (filteredPositions.length === 0) {
+      grid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 24px; background: var(--bg-card); border-radius: 14px; border: 1px solid var(--border-color); color: var(--text-muted);">
+          Ninguna posición abierta tiene hoy la señal <strong>${this.activeRacionalFilter}</strong> para Racional.
+          <button type="button" class="btn btn-secondary" style="margin-left: 10px; padding: 4px 10px; font-size: 11px;" onclick="app.filterCardsByRacional('ALL')">Ver Todas</button>
+        </div>
+      `;
+      return;
+    }
+
     let html = '';
-    openPositions.forEach(pos => {
+    filteredPositions.forEach(pos => {
       const uGain = pos.unrealizedGain || 0;
       const uPct = pos.unrealizedGainPercent || 0;
       const isPositive = uGain >= 0;
@@ -374,6 +428,18 @@ const app = {
       const stopLbl = fc.isTrailingStop ? 'Trailing' : 'Stop';
       const stopVal = fc.suggestedStopLoss ? `$${fc.suggestedStopLoss.toFixed(2)}` : '-';
       const targetVal = fc.targetPrice ? `$${fc.targetPrice.toFixed(2)}` : '-';
+
+      const rAction = fc.racionalAction || 'MANTENER POSICIÓN';
+      const rSub = fc.racionalSubtext || 'Mantener en Racional';
+      let bannerClass = 'rac-banner-hold';
+      let rIcon = '🔵';
+      if (rAction === 'COMPRAR+') {
+        bannerClass = 'rac-banner-buy';
+        rIcon = '🟢';
+      } else if (rAction === 'VENDER') {
+        bannerClass = 'rac-banner-sell';
+        rIcon = '🔴';
+      }
 
       html += `
         <div class="holding-card" onclick="app.openTickerAnalysisModal('${pos.symbol}')">
@@ -398,12 +464,17 @@ const app = {
             </div>
           </div>
 
-          <!-- Cinta Cuantitativa Kalshi: Probabilidad, Target, Stop y R/R -->
-          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 6px 10px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border-subtle); font-family: var(--font-mono);" onclick="event.stopPropagation(); app.openForecastModal(${pos.id})" title="Haz clic para abrir Pronóstico Kalshi y Simulador DCA">
-            <span style="color: ${kProb >= 60 ? 'var(--primary-hover)' : (kProb < 42 ? 'var(--danger)' : 'var(--warning)')}; font-weight: 800;">⚡ ${kProb}% Prob.</span>
-            <span style="color: var(--text-secondary);">🎯 ${targetVal}</span>
-            <span style="color: var(--text-muted);">${stopLbl}: ${stopVal}</span>
-            <span style="color: var(--accent-blue); font-weight: 700;">1:${rrRatio}</span>
+          <!-- BANNER PRINCIPAL DE ACCIÓN CLARA PARA EJECUTAR EN RACIONAL PREMIUM -->
+          <div class="racional-card-banner ${bannerClass}" onclick="event.stopPropagation(); app.openForecastModal(${pos.id})" title="Haz clic para ver instrucción detallada para Racional y Simulador DCA">
+            <div>
+              <div style="font-size: 9.5px; font-weight: 800; color: var(--text-muted); letter-spacing: 0.4px; text-transform: uppercase;">📲 ACCIÓN EN RACIONAL:</div>
+              <div class="racional-action-title">${rIcon} ${rAction}</div>
+              <div class="racional-action-sub">${rSub}</div>
+            </div>
+            <div style="text-align: right; font-family: var(--font-mono);">
+              <div style="font-size: 12px; font-weight: 800; color: ${kProb >= 60 ? 'var(--primary-hover)' : (kProb < 42 ? 'var(--danger)' : 'var(--warning)')};">⚡ ${kProb}% Prob.</div>
+              <div style="font-size: 10px; color: var(--text-muted);">🎯 ${targetVal} • ${stopLbl} ${stopVal}</div>
+            </div>
           </div>
 
           <div class="holding-details-row">
@@ -413,13 +484,13 @@ const app = {
 
           <div class="holding-card-actions" style="grid-template-columns: 1fr 1fr auto;" onclick="event.stopPropagation()">
             <button type="button" class="btn-card-action btn-card-buy" onclick="app.quickBuyCurrentTicker('${pos.symbol}', ${pos.livePrice || pos.buy_price})">
-              ➕ Comprar
+              ➕ Comprar+
             </button>
             <button type="button" class="btn-card-action btn-card-sell" onclick="app.quickSellCurrentTicker('${pos.symbol}', ${pos.quantity}, ${pos.livePrice || pos.buy_price})">
               💵 Vender
             </button>
-            <button type="button" class="btn-card-action" style="background: var(--bg-surface-elevated); color: var(--text-main); border: 1px solid var(--border-color); padding: 7px 10px;" onclick="app.openForecastModal(${pos.id})" title="Simulador DCA y Pronóstico Cuantitativo">
-              🧮 DCA
+            <button type="button" class="btn-card-action" style="background: var(--bg-surface-elevated); color: var(--text-main); border: 1px solid var(--border-color); padding: 7px 10px;" onclick="app.openForecastModal(${pos.id})" title="Ver Instrucción Racional y Simulador DCA">
+              📲 Racional / DCA
             </button>
           </div>
         </div>
@@ -1371,9 +1442,9 @@ const app = {
           </td>
           <td>${p.daysHeld}d</td>
           <td>
-            <div onclick="app.openForecastModal(${p.id})" style="cursor: pointer;" title="Haz clic para ver el pronóstico cuantitativo Kalshi y Simulador DCA">
-              <span class="${p.forecast.actionColor === 'danger' ? 'badge-down' : (p.forecast.actionColor === 'warning' ? 'badge-neutral' : 'badge-up')}" style="font-size: 11px; padding: 4px 8px;">
-                ${p.forecast.actionColor === 'danger' ? '🔴 ' : (p.forecast.actionColor === 'warning' ? '🟡 ' : '🟢 ')}${p.forecast.action || 'MANTENER'}
+            <div onclick="app.openForecastModal(${p.id})" style="cursor: pointer;" title="Haz clic para ver la instrucción para Racional Premium y Simulador DCA">
+              <span class="${p.forecast.racionalAction === 'VENDER' ? 'badge-down' : (p.forecast.racionalAction === 'COMPRAR+' ? 'badge-up' : 'badge-neutral')}" style="font-size: 11.5px; padding: 4px 10px; font-weight: 800;">
+                📲 ${p.forecast.racionalBadge || '🔵 MANTENER POSICIÓN'}
               </span>
               <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px; font-weight: 700; font-family: var(--font-mono);">
                 ⚡ ${p.forecast.kalshiProb || 60}% Prob • 🎯 $${(p.forecast.targetPrice || 0).toFixed(2)} • 1:${p.forecast.riskRewardRatio || 2.0}
@@ -1875,8 +1946,32 @@ const app = {
     }
 
     const actionElem = document.getElementById('fc-modal-action');
-    actionElem.innerText = fc.action;
-    actionElem.className = fc.actionColor === 'danger' ? 'text-danger' : (fc.actionColor === 'warning' ? 'text-warning' : 'text-success');
+    const racSubElem = document.getElementById('fc-modal-racional-sub');
+    const racInstElem = document.getElementById('fc-modal-racional-instruction');
+    const racBoxElem = document.getElementById('fc-modal-racional-box');
+
+    const rAction = fc.racionalAction || fc.action || 'MANTENER POSICIÓN';
+    actionElem.innerText = fc.racionalBadge || `🔵 ${rAction}`;
+    actionElem.style.color = rAction === 'VENDER' ? 'var(--danger)' : (rAction === 'COMPRAR+' ? 'var(--primary-hover)' : 'var(--accent-blue)');
+
+    if (racSubElem) {
+      racSubElem.innerText = fc.racionalSubtext || '';
+    }
+    if (racInstElem) {
+      racInstElem.innerText = fc.racionalInstruction || fc.reason || '';
+    }
+    if (racBoxElem) {
+      if (rAction === 'VENDER') {
+        racBoxElem.style.background = 'var(--danger-bg)';
+        racBoxElem.style.borderColor = 'rgba(217, 45, 32, 0.45)';
+      } else if (rAction === 'COMPRAR+') {
+        racBoxElem.style.background = 'var(--primary-light)';
+        racBoxElem.style.borderColor = 'rgba(10, 194, 133, 0.45)';
+      } else {
+        racBoxElem.style.background = 'rgba(37, 99, 235, 0.10)';
+        racBoxElem.style.borderColor = 'rgba(37, 99, 235, 0.35)';
+      }
+    }
 
     document.getElementById('fc-modal-horizon').innerText = fc.horizon;
     const atrRangeEl = document.getElementById('fc-modal-atr-range');

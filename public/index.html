@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   
   <!-- CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=3.0.0">
+  <link rel="stylesheet" href="/css/styles.css?v=3.1.0">
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -173,14 +173,36 @@
 
       <!-- SECCIÓN DEDICADA: DECK DE POSICIONES ABIERTAS ACTIVAS (CARDS INTERACTIVAS) -->
       <div class="active-holdings-section" style="margin-bottom: 28px;">
-        <div class="section-header-row">
+        <div class="section-header-row" style="flex-wrap: wrap; gap: 10px;">
           <div class="section-title">
-            <span>🟢 Posiciones Abiertas en Cartera</span>
+            <span>🟢 Posiciones Abiertas & Órdenes para Racional Premium</span>
             <span class="section-badge-count" id="badge-holdings-count">0 activas</span>
           </div>
-          <div style="display: flex; gap: 8px;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button class="btn btn-secondary" style="font-size: 12px; padding: 5px 12px;" onclick="app.switchTab('open')">
               📑 Ver en Tabla Detallada →
+            </button>
+          </div>
+        </div>
+
+        <!-- RESUMEN OPERATIVO DE ÓRDENES PARA RACIONAL (CHILE) CON FILTROS RÁPIDOS -->
+        <div class="racional-command-bar" id="racional-command-bar">
+          <div class="racional-bar-left">
+            <span class="racional-logo-badge">📲 RACIONAL PREMIUM</span>
+            <span class="racional-bar-title">Guía de Ejecución Hoy:</span>
+          </div>
+          <div class="racional-filter-pills">
+            <button type="button" class="racional-filter-btn active" id="btn-rac-all" onclick="app.filterCardsByRacional('ALL')">
+              Todas (<span id="rac-count-all">0</span>)
+            </button>
+            <button type="button" class="racional-filter-btn rac-buy" id="btn-rac-buy" onclick="app.filterCardsByRacional('COMPRAR+')">
+              🟢 Comprar+ (<span id="rac-count-buy">0</span>)
+            </button>
+            <button type="button" class="racional-filter-btn rac-sell" id="btn-rac-sell" onclick="app.filterCardsByRacional('VENDER')">
+              🔴 Vender (<span id="rac-count-sell">0</span>)
+            </button>
+            <button type="button" class="racional-filter-btn rac-hold" id="btn-rac-hold" onclick="app.filterCardsByRacional('MANTENER POSICIÓN')">
+              🔵 Mantener posición (<span id="rac-count-hold">0</span>)
             </button>
           </div>
         </div>
@@ -378,7 +400,7 @@
                 <th>Ganancia / Pérdida US$</th>
                 <th>Retorno %</th>
                 <th>Días</th>
-                <th>🤖 Pronóstico & Horizonte</th>
+                <th>📲 Acción en Racional & Pronóstico</th>
                 <th style="text-align: center; background: rgba(16, 185, 129, 0.2); color: #10b981;">Operación</th>
               </tr>
             </thead>
@@ -722,11 +744,12 @@
         </div>
       </div>
 
-      <!-- Decisión y Horizonte -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+      <!-- Decisión para Racional Premium y Horizonte -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
         <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: 10px; border: 1px solid var(--border-color);">
-          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Recomendación Táctica</div>
-          <div id="fc-modal-action" style="font-size: 17px; font-weight: 800; margin-top: 4px;">MANTENER</div>
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">📲 Acción en Racional Premium</div>
+          <div id="fc-modal-action" style="font-size: 18px; font-weight: 800; margin-top: 4px;">🔵 MANTENER POSICIÓN</div>
+          <div id="fc-modal-racional-sub" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">No operar hoy en Racional</div>
         </div>
 
         <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: 10px; border: 1px solid var(--border-color);">
@@ -734,6 +757,14 @@
           <div id="fc-modal-horizon" style="font-size: 16px; font-weight: 800; color: var(--accent-blue); margin-top: 4px;">2 a 3 Semanas</div>
           <div id="fc-modal-atr-range" style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px;">Rango 5D: $0 - $0</div>
         </div>
+      </div>
+
+      <!-- Guía Paso a Paso de Ejecución en Racional (Chile) -->
+      <div class="racional-instruction-box" id="fc-modal-racional-box">
+        <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+          <span>📲 Instrucción Directa para tu Cuenta Racional Premium (Bolsa EE.UU.)</span>
+        </div>
+        <div id="fc-modal-racional-instruction" style="font-size: 13px; font-weight: 600; color: var(--text-main); line-height: 1.45;"></div>
       </div>
 
       <!-- Niveles Operativos: Objetivo, Actual/Compra, Stop/Trailing -->
@@ -1246,6 +1277,6 @@
   </div>
 
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=3.0.0"></script>
+  <script src="/js/app.js?v=3.1.0"></script>
 </body>
 </html>
