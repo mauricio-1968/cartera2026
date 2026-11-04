@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   
   <!-- CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=3.1.0">
+  <link rel="stylesheet" href="/css/styles.css?v=3.2.0">
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -837,8 +837,11 @@
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap;">
-        <button type="button" class="btn btn-secondary" onclick="app.viewCurrentForecastOnChart()">📈 Ver Niveles en Gráfico Kalshi</button>
-        <button type="button" class="btn btn-primary" onclick="app.closeForecastModal()">Entendido / Cerrar</button>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-secondary" onclick="app.viewCurrentForecastOnChart()">📈 Ver Niveles en Gráfico Kalshi</button>
+          <button type="button" class="btn btn-primary" style="background: #0AC285; border-color: #0AC285; color: #fff; font-weight: 800;" onclick="app.openRacionalBridgeFromForecast()">⚡ Operar 1-Clic en Racional</button>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="app.closeForecastModal()">Cerrar</button>
       </div>
     </div>
   </div>
@@ -1276,7 +1279,151 @@
     </div>
   </div>
 
+  <!-- MODAL: PUENTE RÁPIDO 1-CLIC HACIA RACIONAL PREMIUM (BOLETA INTELIGENTE + AUTO-REGISTRO) -->
+  <div class="modal-backdrop" id="modal-racional-bridge">
+    <div class="modal-box" style="max-width: 620px; max-height: 92vh; overflow-y: auto;">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 14px;">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span>⚡ Puente Rápido 1-Clic — Racional Premium</span>
+          <span class="brand-badge" id="rb-symbol-badge">TSLA</span>
+          <span id="rb-signal-pill" style="font-size: 11px; padding: 3px 9px; border-radius: 6px; font-weight: 800;">🟢 COMPRAR+</span>
+        </div>
+        <button class="modal-close" onclick="app.closeRacionalBridgeModal()">✕</button>
+      </div>
+
+      <!-- Selector de Modo en Racional: COMPRAR+ vs VENDER -->
+      <div class="racional-mode-tabs" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;">
+        <button type="button" id="rb-tab-buy" class="racional-mode-tab active-buy" onclick="app.setRacionalBridgeMode('BUY')">
+          🟢 COMPRAR+ en Racional
+        </button>
+        <button type="button" id="rb-tab-sell" class="racional-mode-tab" onclick="app.setRacionalBridgeMode('SELL')">
+          🔴 VENDER en Racional
+        </button>
+      </div>
+
+      <!-- Resumen de Posición Actual en Cartera -->
+      <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: 10px; padding: 11px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <div id="rb-company-name" style="font-size: 13px; font-weight: 800; color: var(--text-main);">Tesla Inc.</div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+            Posición actual: <strong id="rb-curr-qty" style="color: var(--text-main); font-family: var(--font-mono);">0.0000 acc.</strong> · Compra Prom.: <strong id="rb-curr-avg" style="color: var(--text-main); font-family: var(--font-mono);">$0.00</strong>
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Cotización EE.UU.</div>
+          <div id="rb-live-price" style="font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: var(--accent-blue);">$0.00</div>
+        </div>
+      </div>
+
+      <!-- Controles Rápidos según Modo -->
+      <!-- Panel COMPRAR+ -->
+      <div id="rb-buy-controls" style="background: rgba(10, 194, 133, 0.06); border: 1px solid rgba(10, 194, 133, 0.28); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+          <span style="font-size: 11px; font-weight: 800; color: var(--primary-hover); text-transform: uppercase;">💵 Monto US$ a Comprar en Racional:</span>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" class="kalshi-tf-btn" onclick="app.setRacionalBridgeBuyAmount(50)">+$50</button>
+            <button type="button" class="kalshi-tf-btn active" onclick="app.setRacionalBridgeBuyAmount(100)">+$100</button>
+            <button type="button" class="kalshi-tf-btn" onclick="app.setRacionalBridgeBuyAmount(250)">+$250</button>
+            <button type="button" class="kalshi-tf-btn" onclick="app.setRacionalBridgeBuyAmount(500)">+$500</button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom: 8px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 11px;">Monto Exacto a Invertir (US$)</label>
+            <input type="number" step="any" id="rb-buy-usd-input" class="form-input" value="100" oninput="app.updateRacionalBridgeCalculations()" style="font-family: var(--font-mono); font-weight: 800;">
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 11px;">Precio Límite / Ejecución (US$)</label>
+            <input type="number" step="any" id="rb-exec-price-input" class="form-input" oninput="app.updateRacionalBridgeCalculations()" style="font-family: var(--font-mono); font-weight: 800;">
+          </div>
+        </div>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-main); font-weight: 600; cursor: pointer; margin-top: 6px;">
+          <input type="checkbox" id="rb-merge-dca-check" checked onchange="app.updateRacionalBridgeCalculations()" style="width: 16px; height: 16px; accent-color: #0AC285;">
+          <span>Promediar automáticamente (DCA) en mi posición abierta actual de Portrack</span>
+        </label>
+      </div>
+
+      <!-- Panel VENDER -->
+      <div id="rb-sell-controls" style="display: none; background: rgba(217, 48, 78, 0.06); border: 1px solid rgba(217, 48, 78, 0.28); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+          <span style="font-size: 11px; font-weight: 800; color: var(--danger); text-transform: uppercase;">📉 Porcentaje de tu Posición a Vender:</span>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" class="kalshi-tf-btn active" id="rb-pct-100" onclick="app.setRacionalBridgeSellPct(100)">100% Total</button>
+            <button type="button" class="kalshi-tf-btn" id="rb-pct-50" onclick="app.setRacionalBridgeSellPct(50)">50% Mitad</button>
+            <button type="button" class="kalshi-tf-btn" id="rb-pct-25" onclick="app.setRacionalBridgeSellPct(25)">25% Parcial</button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom: 4px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 11px;">Acciones a Vender</label>
+            <input type="number" step="any" id="rb-sell-qty-input" class="form-input" readonly style="font-family: var(--font-mono); font-weight: 800; opacity: 0.9;">
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 11px;">Precio Venta en Racional (US$)</label>
+            <input type="number" step="any" id="rb-sell-price-input" class="form-input" oninput="app.syncRacionalSellPrice(this.value)" style="font-family: var(--font-mono); font-weight: 800;">
+          </div>
+        </div>
+      </div>
+
+      <!-- BOLETA LISTA PARA COPIAR Y PEGAR EN RACIONAL PREMIUM -->
+      <div class="racional-bridge-ticket">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">📋 Boleta Lista para Racional Premium</span>
+          <span id="rb-copy-toast" style="font-size: 11px; font-weight: 800; color: var(--primary-hover); display: none;">✓ ¡Copiado al portapapeles!</span>
+        </div>
+
+        <div class="racional-copy-row">
+          <div>
+            <div class="racional-copy-label">1. Buscador Racional (Ticker EE.UU.)</div>
+            <div class="racional-copy-val" id="rb-ticket-symbol">TSLA</div>
+          </div>
+          <button type="button" class="btn-copy-chip" onclick="app.copyRacionalField('symbol')">📋 Copiar Ticker</button>
+        </div>
+
+        <div class="racional-copy-row">
+          <div>
+            <div class="racional-copy-label">2. Tipo de Orden Sugerida en Racional</div>
+            <div class="racional-copy-val" id="rb-ticket-order-type" style="font-size: 13px;">Orden Límite / Mercado</div>
+          </div>
+          <span id="rb-ticket-action-badge" style="font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 6px; background: var(--primary-light); color: var(--primary-hover);">COMPRAR+</span>
+        </div>
+
+        <div class="racional-copy-row">
+          <div>
+            <div class="racional-copy-label">3. Precio Límite / Ejecución (US$)</div>
+            <div class="racional-copy-val" id="rb-ticket-price">$0.00</div>
+          </div>
+          <button type="button" class="btn-copy-chip" onclick="app.copyRacionalField('price')">📋 Copiar Precio</button>
+        </div>
+
+        <div class="racional-copy-row" style="border-bottom: none; padding-bottom: 0;">
+          <div>
+            <div class="racional-copy-label" id="rb-ticket-amount-label">4. Monto a Invertir en Racional (US$)</div>
+            <div class="racional-copy-val" id="rb-ticket-amount" style="color: var(--primary-hover);">$100.00 US$ (0.0000 acc.)</div>
+          </div>
+          <button type="button" class="btn-copy-chip" onclick="app.copyRacionalField('amount')">📋 Copiar Monto</button>
+        </div>
+      </div>
+
+      <!-- Impacto proyectado en tu cartera Portrack al confirmar -->
+      <div id="rb-impact-box" style="background: var(--bg-surface-elevated); border-left: 4px solid #0AC285; border-radius: 8px; padding: 11px 14px; margin: 14px 0; font-size: 12px; color: var(--text-main); line-height: 1.5;">
+        <!-- Dinámico -->
+      </div>
+
+      <!-- FLUJO EN 2 PASOS (1 CLIC PARA IR A RACIONAL + 1 CLIC PARA AUTO-REGISTRAR) -->
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
+        <button type="button" class="btn btn-secondary" style="width: 100%; justify-content: center; padding: 12px; font-size: 13px; font-weight: 800; border: 1.5px solid var(--accent-blue); color: var(--accent-blue); display: flex; align-items: center; gap: 8px;" onclick="app.launchRacionalWebAndCopy()">
+          <span>🚀 PASO 1: Copiar Monto y Abrir Racional Premium (app.racional.cl)</span> ↗
+        </button>
+
+        <button type="button" id="rb-confirm-btn" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 13px; font-size: 14px; font-weight: 800; background: #0AC285; border-color: #0AC285; color: #fff; display: flex; align-items: center; gap: 8px;" onclick="app.confirmRacionalOneClickExecution()">
+          <span>✅ PASO 2: ¡Listo, ya lo hice en Racional! Auto-Registrar en 1 Clic</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=3.1.0"></script>
+  <script src="/js/app.js?v=3.2.0"></script>
 </body>
 </html>

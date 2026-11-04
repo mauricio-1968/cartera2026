@@ -483,14 +483,14 @@ const app = {
           </div>
 
           <div class="holding-card-actions" style="grid-template-columns: 1fr 1fr auto;" onclick="event.stopPropagation()">
-            <button type="button" class="btn-card-action btn-card-buy" onclick="app.quickBuyCurrentTicker('${pos.symbol}', ${pos.livePrice || pos.buy_price})">
-              ➕ Comprar+
+            <button type="button" class="btn-card-action btn-card-buy" onclick="app.openRacionalBridgeModal(${pos.id}, 'BUY')" title="Abrir Boleta 1-Clic para Comprar+ y Promediar en Racional">
+              🟢 Comprar+ 1-Clic
             </button>
-            <button type="button" class="btn-card-action btn-card-sell" onclick="app.quickSellCurrentTicker('${pos.symbol}', ${pos.quantity}, ${pos.livePrice || pos.buy_price})">
-              💵 Vender
+            <button type="button" class="btn-card-action btn-card-sell" onclick="app.openRacionalBridgeModal(${pos.id}, 'SELL')" title="Abrir Boleta 1-Clic para Vender Total o Parcial en Racional">
+              🔴 Vender 1-Clic
             </button>
-            <button type="button" class="btn-card-action" style="background: var(--bg-surface-elevated); color: var(--text-main); border: 1px solid var(--border-color); padding: 7px 10px;" onclick="app.openForecastModal(${pos.id})" title="Ver Instrucción Racional y Simulador DCA">
-              📲 Racional / DCA
+            <button type="button" class="btn-card-action" style="background: var(--bg-surface-elevated); color: var(--text-main); border: 1px solid var(--border-color); padding: 7px 10px;" onclick="app.openForecastModal(${pos.id})" title="Ver Pronóstico Kalshi y Simulador DCA">
+              📊 Pronóstico
             </button>
           </div>
         </div>
@@ -1453,8 +1453,11 @@ const app = {
           </td>
           <td style="text-align: center;">
             <div style="display: flex; gap: 6px; justify-content: center;">
-              <button class="btn btn-success" style="padding: 6px 10px; font-weight: 700; font-size: 11px;" onclick="app.openSellModal(${p.id}, '${p.symbol}', ${p.livePrice})">
-                💵 VENDER
+              <button class="btn btn-primary" style="padding: 6px 10px; font-weight: 800; font-size: 11px; background: #0AC285; border-color: #0AC285;" onclick="app.openRacionalBridgeModal(${p.id})" title="Boleta Inteligente 1-Clic para Racional Premium">
+                ⚡ 1-Clic Racional
+              </button>
+              <button class="btn btn-success" style="padding: 6px 9px; font-weight: 700; font-size: 11px;" onclick="app.openSellModal(${p.id}, '${p.symbol}', ${p.livePrice})" title="Venta Clásica">
+                💵
               </button>
               <button class="btn btn-secondary" style="padding: 6px 8px; font-size: 11px; color: var(--accent-blue);" onclick="app.openTickerAnalysisModal('${p.symbol}')" title="Análisis 360°">
                 🔍
@@ -2708,6 +2711,349 @@ const app = {
       await this.fetchPortfolio();
     } catch (err) {
       alert('Error eliminando la transacción: ' + err.message);
+    }
+  },
+
+  // ==========================================
+  // PUENTE RÁPIDO 1-CLIC HACIA RACIONAL PREMIUM (BOLETA INTELIGENTE + AUTO-REGISTRO)
+  // ==========================================
+  racionalBridgeState: {
+    pos: null,
+    mode: 'BUY', // 'BUY' | 'SELL'
+    buyUsd: 100,
+    sellPct: 100,
+    execPrice: 0
+  },
+
+  openRacionalBridgeFromForecast() {
+    const pos = this.currentForecastPos;
+    if (!pos) return;
+    const dcaUsd = parseFloat(document.getElementById('fc-dca-input')?.value) || 100;
+    this.closeForecastModal();
+    const rAct = (pos.forecast && pos.forecast.racionalAction) || 'MANTENER POSICIÓN';
+    const prefMode = rAct === 'VENDER' ? 'SELL' : 'BUY';
+    this.openRacionalBridgeModal(pos.id, prefMode, dcaUsd);
+  },
+
+  openRacionalBridgeModal(posId, preferredMode, initialUsd) {
+    const openPositions = (this.data && this.data.openPositions) || [];
+    const pos = openPositions.find(p => Number(p.id) === Number(posId));
+    if (!pos) {
+      alert('No se encontró la posición abierta seleccionada.');
+      return;
+    }
+
+    const fc = pos.forecast || {};
+    const rAction = fc.racionalAction || 'MANTENER POSICIÓN';
+    let mode = preferredMode;
+    if (!mode) {
+      mode = rAction === 'VENDER' ? 'SELL' : 'BUY';
+    }
+
+    const livePrice = Number(pos.livePrice || fc.currentPrice || pos.buy_price || 1);
+    this.racionalBridgeState.pos = pos;
+    this.racionalBridgeState.mode = mode;
+    this.racionalBridgeState.buyUsd = initialUsd && initialUsd > 0 ? initialUsd : 100;
+    this.racionalBridgeState.sellPct = (rAction === 'VENDER' && (pos.unrealizedGainPercent || 0) >= 8 && (pos.unrealizedGainPercent || 0) < 15) ? 50 : 100;
+    this.racionalBridgeState.execPrice = Number(livePrice.toFixed(2));
+
+    // Cabecera de la Boleta
+    const symBadge = document.getElementById('rb-symbol-badge');
+    const sigPill = document.getElementById('rb-signal-pill');
+    const compName = document.getElementById('rb-company-name');
+    const currQty = document.getElementById('rb-curr-qty');
+    const currAvg = document.getElementById('rb-curr-avg');
+    const livePriceEl = document.getElementById('rb-live-price');
+
+    if (symBadge) symBadge.innerText = pos.symbol;
+    if (sigPill) {
+      sigPill.innerText = fc.racionalBadge || `🔵 ${rAction}`;
+      if (rAction === 'VENDER') {
+        sigPill.style.background = 'var(--danger-bg)';
+        sigPill.style.color = 'var(--danger)';
+      } else if (rAction === 'COMPRAR+') {
+        sigPill.style.background = 'var(--primary-light)';
+        sigPill.style.color = 'var(--primary-hover)';
+      } else {
+        sigPill.style.background = 'rgba(37, 99, 235, 0.12)';
+        sigPill.style.color = 'var(--accent-blue)';
+      }
+    }
+    if (compName) compName.innerText = pos.original_name || pos.symbol;
+    if (currQty) currQty.innerText = `${Number(pos.quantity).toFixed(4)} acc.`;
+    if (currAvg) currAvg.innerText = `$${Number(pos.buy_price).toFixed(2)}`;
+    if (livePriceEl) livePriceEl.innerText = `$${livePrice.toFixed(2)}`;
+
+    // Inputs iniciales
+    const buyUsdInput = document.getElementById('rb-buy-usd-input');
+    const execPriceInput = document.getElementById('rb-exec-price-input');
+    const sellPriceInput = document.getElementById('rb-sell-price-input');
+    const mergeCheck = document.getElementById('rb-merge-dca-check');
+
+    if (buyUsdInput) buyUsdInput.value = this.racionalBridgeState.buyUsd;
+    if (execPriceInput) execPriceInput.value = livePrice.toFixed(2);
+    if (sellPriceInput) sellPriceInput.value = livePrice.toFixed(2);
+    if (mergeCheck) mergeCheck.checked = true;
+
+    this.setRacionalBridgeMode(mode);
+    document.getElementById('modal-racional-bridge').classList.add('active');
+  },
+
+  closeRacionalBridgeModal() {
+    document.getElementById('modal-racional-bridge').classList.remove('active');
+  },
+
+  setRacionalBridgeMode(mode) {
+    this.racionalBridgeState.mode = mode === 'SELL' ? 'SELL' : 'BUY';
+    const isBuy = this.racionalBridgeState.mode === 'BUY';
+
+    const tabBuy = document.getElementById('rb-tab-buy');
+    const tabSell = document.getElementById('rb-tab-sell');
+    const buyControls = document.getElementById('rb-buy-controls');
+    const sellControls = document.getElementById('rb-sell-controls');
+    const confirmBtn = document.getElementById('rb-confirm-btn');
+
+    if (tabBuy) tabBuy.className = `racional-mode-tab ${isBuy ? 'active-buy' : ''}`;
+    if (tabSell) tabSell.className = `racional-mode-tab ${!isBuy ? 'active-sell' : ''}`;
+    if (buyControls) buyControls.style.display = isBuy ? 'block' : 'none';
+    if (sellControls) sellControls.style.display = !isBuy ? 'block' : 'none';
+
+    if (confirmBtn) {
+      if (isBuy) {
+        confirmBtn.style.background = '#0AC285';
+        confirmBtn.style.borderColor = '#0AC285';
+        confirmBtn.innerHTML = '<span>✅ PASO 2: ¡Listo, ya Compré en Racional! Auto-Registrar en 1 Clic</span>';
+      } else {
+        confirmBtn.style.background = '#E53935';
+        confirmBtn.style.borderColor = '#E53935';
+        confirmBtn.innerHTML = '<span>✅ PASO 2: ¡Listo, ya Vendí en Racional! Auto-Registrar en 1 Clic</span>';
+      }
+    }
+
+    if (!isBuy) {
+      this.setRacionalBridgeSellPct(this.racionalBridgeState.sellPct || 100);
+    } else {
+      this.updateRacionalBridgeCalculations();
+    }
+  },
+
+  setRacionalBridgeBuyAmount(usd) {
+    this.racionalBridgeState.buyUsd = Number(usd) || 100;
+    const input = document.getElementById('rb-buy-usd-input');
+    if (input) input.value = this.racionalBridgeState.buyUsd;
+    this.updateRacionalBridgeCalculations();
+  },
+
+  setRacionalBridgeSellPct(pct) {
+    this.racionalBridgeState.sellPct = Number(pct) || 100;
+    [100, 50, 25].forEach(val => {
+      const btn = document.getElementById(`rb-pct-${val}`);
+      if (btn) {
+        if (val === this.racionalBridgeState.sellPct) btn.classList.add('active');
+        else btn.classList.remove('active');
+      }
+    });
+    this.updateRacionalBridgeCalculations();
+  },
+
+  syncRacionalSellPrice(val) {
+    const execInput = document.getElementById('rb-exec-price-input');
+    if (execInput) execInput.value = val;
+    this.updateRacionalBridgeCalculations();
+  },
+
+  updateRacionalBridgeCalculations() {
+    const pos = this.racionalBridgeState.pos;
+    if (!pos) return;
+
+    const isBuy = this.racionalBridgeState.mode === 'BUY';
+    const rawPrice = isBuy
+      ? document.getElementById('rb-exec-price-input')?.value
+      : document.getElementById('rb-sell-price-input')?.value;
+    const execPrice = Math.max(0.01, parseFloat(String(rawPrice || pos.livePrice || pos.buy_price).replace(',', '.')) || Number(pos.livePrice || pos.buy_price));
+    this.racionalBridgeState.execPrice = execPrice;
+
+    const tSym = document.getElementById('rb-ticket-symbol');
+    const tOrderType = document.getElementById('rb-ticket-order-type');
+    const tBadge = document.getElementById('rb-ticket-action-badge');
+    const tPrice = document.getElementById('rb-ticket-price');
+    const tAmtLabel = document.getElementById('rb-ticket-amount-label');
+    const tAmtVal = document.getElementById('rb-ticket-amount');
+    const impactBox = document.getElementById('rb-impact-box');
+
+    if (tSym) tSym.innerText = pos.symbol;
+    if (tPrice) tPrice.innerText = `$${execPrice.toFixed(2)}`;
+
+    if (isBuy) {
+      const buyUsd = Math.max(1, parseFloat(String(document.getElementById('rb-buy-usd-input')?.value || 100).replace(',', '.')) || 100);
+      this.racionalBridgeState.buyUsd = buyUsd;
+      const addedShares = buyUsd / execPrice;
+      const mergeDca = document.getElementById('rb-merge-dca-check')?.checked !== false;
+
+      const oldQty = Number(pos.quantity) || 0;
+      const oldTotal = Number(pos.buy_total) || (oldQty * Number(pos.buy_price));
+      const newQty = oldQty + addedShares;
+      const newTotal = oldTotal + buyUsd;
+      const newAvg = newQty > 0 ? newTotal / newQty : execPrice;
+      const diffAvg = newAvg - Number(pos.buy_price);
+
+      if (tOrderType) tOrderType.innerText = 'Compra en Dólares (Orden a Mercado o Límite)';
+      if (tBadge) {
+        tBadge.innerText = '🟢 COMPRAR+';
+        tBadge.style.background = 'var(--primary-light)';
+        tBadge.style.color = 'var(--primary-hover)';
+      }
+      if (tAmtLabel) tAmtLabel.innerText = '4. Monto US$ a Invertir en Racional';
+      if (tAmtVal) {
+        tAmtVal.innerText = `$${buyUsd.toFixed(2)} US$ (+${addedShares.toFixed(4)} acc.)`;
+        tAmtVal.style.color = 'var(--primary-hover)';
+      }
+
+      if (impactBox) {
+        impactBox.style.borderLeftColor = '#0AC285';
+        if (mergeDca) {
+          const dirTxt = Math.abs(diffAvg) < 0.01
+            ? 'se mantiene igual'
+            : (diffAvg < 0 ? `baja en -$${Math.abs(diffAvg).toFixed(2)}` : `sube en +$${diffAvg.toFixed(2)}`);
+          impactBox.innerHTML = `
+            <strong>📊 Efecto Automático en tu Cartera (DCA):</strong><br>
+            Tu posición en <strong>${pos.symbol}</strong> pasará de <strong>${oldQty.toFixed(4)}</strong> a <strong>${newQty.toFixed(4)} acciones</strong> (Total invertido: <strong>$${newTotal.toFixed(2)} US$</strong>). Tu Precio Promedio de Compra <strong>${dirTxt}</strong> de $${Number(pos.buy_price).toFixed(2)} a <strong>$${newAvg.toFixed(2)} US$</strong>.
+          `;
+        } else {
+          impactBox.innerHTML = `
+            <strong>📊 Efecto Automático en tu Cartera:</strong><br>
+            Se creará una nueva orden abierta independiente de <strong>${pos.symbol}</strong> por <strong>+$${buyUsd.toFixed(2)} US$ (${addedShares.toFixed(4)} acc. a $${execPrice.toFixed(2)})</strong>.
+          `;
+        }
+      }
+    } else {
+      // MODO VENDER
+      const pct = this.racionalBridgeState.sellPct || 100;
+      const oldQty = Number(pos.quantity) || 0;
+      const sellQty = oldQty * (pct / 100);
+      const sellProceeds = sellQty * execPrice;
+      const buyCost = sellQty * Number(pos.buy_price);
+      const netGain = sellProceeds - buyCost;
+      const netPct = buyCost > 0 ? (netGain / buyCost) * 100 : 0;
+      const remQty = Math.max(0, oldQty - sellQty);
+
+      const sellQtyInput = document.getElementById('rb-sell-qty-input');
+      if (sellQtyInput) sellQtyInput.value = sellQty.toFixed(6);
+
+      if (tOrderType) tOrderType.innerText = pct >= 99.9 ? 'Venta Total (100% de tus acciones)' : `Venta Parcial (${pct}% de tu posición)`;
+      if (tBadge) {
+        tBadge.innerText = `🔴 VENDER ${pct}%`;
+        tBadge.style.background = 'var(--danger-bg)';
+        tBadge.style.color = 'var(--danger)';
+      }
+      if (tAmtLabel) tAmtLabel.innerText = '4. Acciones / Monto a Vender en Racional';
+      if (tAmtVal) {
+        tAmtVal.innerText = `${sellQty.toFixed(4)} acc. ($${sellProceeds.toFixed(2)} US$)`;
+        tAmtVal.style.color = 'var(--danger)';
+      }
+
+      if (impactBox) {
+        impactBox.style.borderLeftColor = '#E53935';
+        const gainColor = netGain >= 0 ? 'var(--primary-hover)' : 'var(--danger)';
+        const gainSign = netGain >= 0 ? '+' : '';
+        if (pct >= 99.9) {
+          impactBox.innerHTML = `
+            <strong>💵 Efecto Automático al Confirmar Venta Total (100%):</strong><br>
+            Se cerrará tu posición de <strong>${pos.symbol}</strong> recuperando <strong>$${sellProceeds.toFixed(2)} US$</strong> y registrando en tu Historial de Ventas un resultado realizado de <strong style="color:${gainColor};">${gainSign}$${netGain.toFixed(2)} US$ (${gainSign}${netPct.toFixed(2)}%)</strong>.
+          `;
+        } else {
+          impactBox.innerHTML = `
+            <strong>💵 Efecto Automático al Confirmar Venta Parcial (${pct}%):</strong><br>
+            Aseguras hoy en tu Historial de Ventas <strong style="color:${gainColor};">${gainSign}$${netGain.toFixed(2)} US$ (${gainSign}${netPct.toFixed(2)}%)</strong> por las <strong>${sellQty.toFixed(4)} acc.</strong> vendidas, y mantienes abiertas <strong>${remQty.toFixed(4)} acciones</strong> en tu cartera activa.
+          `;
+        }
+      }
+    }
+  },
+
+  copyRacionalField(fieldType) {
+    const pos = this.racionalBridgeState.pos;
+    if (!pos) return;
+    let textToCopy = '';
+    if (fieldType === 'symbol') {
+      textToCopy = pos.symbol;
+    } else if (fieldType === 'price') {
+      textToCopy = Number(this.racionalBridgeState.execPrice || pos.livePrice || pos.buy_price).toFixed(2);
+    } else if (fieldType === 'amount') {
+      if (this.racionalBridgeState.mode === 'BUY') {
+        textToCopy = Number(this.racionalBridgeState.buyUsd || 100).toFixed(2);
+      } else {
+        const sellQty = Number(pos.quantity) * ((this.racionalBridgeState.sellPct || 100) / 100);
+        textToCopy = sellQty.toFixed(6);
+      }
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(textToCopy).catch(() => {});
+    }
+
+    const toast = document.getElementById('rb-copy-toast');
+    if (toast) {
+      toast.innerText = `✓ Copiado: ${textToCopy}`;
+      toast.style.display = 'inline-block';
+      setTimeout(() => { toast.style.display = 'none'; }, 2600);
+    }
+  },
+
+  launchRacionalWebAndCopy() {
+    const pos = this.racionalBridgeState.pos;
+    if (!pos) return;
+    this.copyRacionalField('symbol');
+    window.open('https://app.racional.cl', '_blank', 'noopener,noreferrer');
+  },
+
+  async confirmRacionalOneClickExecution() {
+    const pos = this.racionalBridgeState.pos;
+    if (!pos) return;
+
+    this.updateRacionalBridgeCalculations();
+    const isBuy = this.racionalBridgeState.mode === 'BUY';
+    const execPrice = this.racionalBridgeState.execPrice;
+    const fc = pos.forecast || {};
+
+    const payload = {
+      mode: isBuy ? 'BUY' : 'SELL',
+      id: pos.id,
+      symbol: pos.symbol,
+      original_name: pos.original_name || pos.symbol,
+      price: execPrice,
+      usdAmount: isBuy ? this.racionalBridgeState.buyUsd : undefined,
+      sellPercent: !isBuy ? this.racionalBridgeState.sellPct : undefined,
+      mergeWithOpen: isBuy ? (document.getElementById('rb-merge-dca-check')?.checked !== false) : undefined,
+      stop_loss: fc.suggestedStopLoss || pos.stop_loss || null
+    };
+
+    const confirmBtn = document.getElementById('rb-confirm-btn');
+    const prevHtml = confirmBtn ? confirmBtn.innerHTML : '';
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<span>⏳ Sincronizando operación con tu Cartera...</span>';
+    }
+
+    try {
+      const res = await fetch('/api/transactions/racional-execute', {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo auto-registrar la operación.');
+
+      this.closeRacionalBridgeModal();
+      alert(data.message || '✅ Operación en Racional registrada automáticamente en tu cartera.');
+      await this.fetchPortfolio();
+    } catch (err) {
+      alert('Error al auto-registrar operación Racional: ' + err.message);
+    } finally {
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = prevHtml;
+      }
     }
   }
 };
