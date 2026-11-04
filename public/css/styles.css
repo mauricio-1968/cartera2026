@@ -1266,6 +1266,171 @@ body.dark-theme .btn-card-buy:hover {
   text-transform: uppercase;
 }
 
+/* ==========================================================
+   KALSHI QUANTITATIVE BAR, PROBABILITY METER, LEVELS & DCA
+   ========================================================== */
+.kalshi-quant-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 14px 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.kalshi-quant-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 12px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.kalshi-quant-item:last-child {
+  border-right: none;
+  padding-right: 0;
+}
+
+.kalshi-quant-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.kalshi-quant-value-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.kalshi-quant-big {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1;
+}
+
+.kalshi-quant-ticker {
+  font-family: var(--font-condensed);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: 0.3px;
+}
+
+.kalshi-quant-pill {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--bg-surface-elevated);
+  color: var(--text-secondary);
+}
+
+.kalshi-quant-pill.pill-up {
+  background: var(--success-bg);
+  color: var(--primary-hover);
+}
+
+.kalshi-quant-pill.pill-warn {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.kalshi-quant-pill.pill-down {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.kalshi-prob-meter {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-surface-elevated);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+
+.kalshi-prob-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0AC285, #28CC95);
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+
+.kalshi-levels-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.kalshi-level-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kalshi-level-chip.level-buy {
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--accent-blue);
+  border: 1px dashed rgba(37, 99, 235, 0.45);
+}
+
+.kalshi-level-chip.level-target {
+  background: var(--success-bg);
+  color: var(--primary-hover);
+  border: 1px dashed rgba(10, 194, 133, 0.45);
+}
+
+.kalshi-level-chip.level-stop {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px dashed rgba(217, 45, 32, 0.45);
+}
+
+.kalshi-level-chip.level-atr {
+  background: var(--bg-surface-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.kalshi-modal-prob-card {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.kalshi-dca-box {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.kalshi-signal-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
 
 /* ==========================================================
    RESPONSIVE DESIGN (PC, TABLET & MOBILE)

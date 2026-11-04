@@ -303,6 +303,46 @@ const app = {
     const countClosed = document.getElementById('count-closed');
     if (countOpen) countOpen.innerText = s.openPositionsCount;
     if (countClosed) countClosed.innerText = s.closedPositionsCount;
+
+    // Actualizar Barra Cuantitativa Kalshi (Probabilidad Alcista, Convicción, Concentración y Salud)
+    const probValEl = document.getElementById('kq-portfolio-prob');
+    const probBarEl = document.getElementById('kq-portfolio-prob-bar');
+    const topConvEl = document.getElementById('kq-top-conviction');
+    const topConvProbEl = document.getElementById('kq-top-conviction-prob');
+    const maxConcSymEl = document.getElementById('kq-max-conc-symbol');
+    const maxConcPctEl = document.getElementById('kq-max-conc-pct');
+    const healthBadgeEl = document.getElementById('kq-health-badge');
+
+    const avgProb = s.avgKalshiProb !== undefined ? s.avgKalshiProb : 62;
+    if (probValEl) probValEl.innerText = `${avgProb}%`;
+    if (probBarEl) probBarEl.style.width = `${Math.max(10, Math.min(100, avgProb))}%`;
+
+    if (topConvEl) topConvEl.innerText = s.topConvictionSymbol || '-';
+    if (topConvProbEl) {
+      topConvProbEl.innerText = `${s.topConvictionProb || 0}% Prob.`;
+      topConvProbEl.className = `kalshi-quant-pill ${(s.topConvictionProb || 0) >= 60 ? 'pill-up' : 'pill-warn'}`;
+    }
+
+    if (maxConcSymEl) maxConcSymEl.innerText = s.maxConcentrationSymbol || '-';
+    if (maxConcPctEl) {
+      const concPct = s.maxConcentrationPct || 0;
+      maxConcPctEl.innerText = `${concPct.toFixed(1)}% Cartera`;
+      maxConcPctEl.className = `kalshi-quant-pill ${s.concentrationAlert ? 'pill-warn' : 'pill-up'}`;
+    }
+
+    if (healthBadgeEl) {
+      const hStatus = s.healthStatus || 'ÓPTIMA';
+      if (s.healthColor === 'warning') {
+        healthBadgeEl.innerText = `🟡 ${hStatus}`;
+        healthBadgeEl.className = 'kalshi-quant-pill pill-warn';
+      } else if (s.healthColor === 'danger') {
+        healthBadgeEl.innerText = `🔴 ${hStatus}`;
+        healthBadgeEl.className = 'kalshi-quant-pill pill-down';
+      } else {
+        healthBadgeEl.innerText = `🟢 ${hStatus}`;
+        healthBadgeEl.className = 'kalshi-quant-pill pill-up';
+      }
+    }
   },
 
   renderOpenPositionsCards(openPositions) {
@@ -328,6 +368,12 @@ const app = {
       const pillClass = isPositive ? 'pill-up' : 'pill-down';
       const dayChangeClass = (pos.change || 0) >= 0 ? 'text-success' : 'text-danger';
       const dayChangeSign = (pos.change || 0) >= 0 ? '+' : '';
+      const fc = pos.forecast || {};
+      const kProb = fc.kalshiProb || 60;
+      const rrRatio = fc.riskRewardRatio || 1.8;
+      const stopLbl = fc.isTrailingStop ? 'Trailing' : 'Stop';
+      const stopVal = fc.suggestedStopLoss ? `$${fc.suggestedStopLoss.toFixed(2)}` : '-';
+      const targetVal = fc.targetPrice ? `$${fc.targetPrice.toFixed(2)}` : '-';
 
       html += `
         <div class="holding-card" onclick="app.openTickerAnalysisModal('${pos.symbol}')">
@@ -352,17 +398,28 @@ const app = {
             </div>
           </div>
 
+          <!-- Cinta Cuantitativa Kalshi: Probabilidad, Target, Stop y R/R -->
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 6px 10px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border-subtle); font-family: var(--font-mono);" onclick="event.stopPropagation(); app.openForecastModal(${pos.id})" title="Haz clic para abrir Pronóstico Kalshi y Simulador DCA">
+            <span style="color: ${kProb >= 60 ? 'var(--primary-hover)' : (kProb < 42 ? 'var(--danger)' : 'var(--warning)')}; font-weight: 800;">⚡ ${kProb}% Prob.</span>
+            <span style="color: var(--text-secondary);">🎯 ${targetVal}</span>
+            <span style="color: var(--text-muted);">${stopLbl}: ${stopVal}</span>
+            <span style="color: var(--accent-blue); font-weight: 700;">1:${rrRatio}</span>
+          </div>
+
           <div class="holding-details-row">
             <span>Compra: <strong>$${parseFloat(pos.buy_price).toFixed(2)}</strong> (${pos.quantity} acc)</span>
             <span>Total: <strong>$${(pos.currentValue || 0).toFixed(2)}</strong></span>
           </div>
 
-          <div class="holding-card-actions" onclick="event.stopPropagation()">
+          <div class="holding-card-actions" style="grid-template-columns: 1fr 1fr auto;" onclick="event.stopPropagation()">
             <button type="button" class="btn-card-action btn-card-buy" onclick="app.quickBuyCurrentTicker('${pos.symbol}', ${pos.livePrice || pos.buy_price})">
               ➕ Comprar
             </button>
             <button type="button" class="btn-card-action btn-card-sell" onclick="app.quickSellCurrentTicker('${pos.symbol}', ${pos.quantity}, ${pos.livePrice || pos.buy_price})">
               💵 Vender
+            </button>
+            <button type="button" class="btn-card-action" style="background: var(--bg-surface-elevated); color: var(--text-main); border: 1px solid var(--border-color); padding: 7px 10px;" onclick="app.openForecastModal(${pos.id})" title="Simulador DCA y Pronóstico Cuantitativo">
+              🧮 DCA
             </button>
           </div>
         </div>
@@ -551,6 +608,7 @@ const app = {
   intradayChartStyle: 'step', // 'step' (Kalshi), 'line' (Curva) o 'candle' (Velas)
   currentTimeframe: '15m',    // '10m', '15m', '30m', '1d', '1w', '1m'
   showVolume: true,
+  showChartLevels: true,
 
   timeframeConfigs: {
     '10m': { interval: '10m', range: '1d', label: '10 Minutos' },
@@ -586,6 +644,12 @@ const app = {
     this.fetchAndRenderIntradayChart(this.selectedIntradaySymbol);
   },
 
+  toggleChartLevels() {
+    this.showChartLevels = !this.showChartLevels;
+    this.updateChartButtons();
+    this.fetchAndRenderIntradayChart(this.selectedIntradaySymbol);
+  },
+
   toggleVolume() {
     this.showVolume = !this.showVolume;
     this.updateChartButtons();
@@ -614,7 +678,16 @@ const app = {
       }
     });
 
-    // 3. Volumen
+    // 3. Niveles Operativos (Compra / Target / Stop)
+    const btnLvl = document.getElementById('btn-chart-levels');
+    const txtLvl = document.getElementById('levels-status-text');
+    if (txtLvl) txtLvl.innerText = this.showChartLevels ? 'ON' : 'OFF';
+    if (btnLvl) {
+      if (this.showChartLevels) btnLvl.classList.add('active');
+      else btnLvl.classList.remove('active');
+    }
+
+    // 4. Volumen
     const btnVol = document.getElementById('btn-chart-volume');
     const txtVol = document.getElementById('volume-status-text');
     if (txtVol) txtVol.innerText = this.showVolume ? 'ON' : 'OFF';
@@ -623,7 +696,7 @@ const app = {
       else btnVol.classList.remove('active');
     }
 
-    // 4. Badge informativo de temporalidad activa
+    // 5. Badge informativo de temporalidad activa
     const badge = document.getElementById('chart-info-badge');
     if (badge) {
       const config = this.timeframeConfigs[this.currentTimeframe] || this.timeframeConfigs['15m'];
@@ -706,6 +779,36 @@ const app = {
       const lastPrice = data.currentPrice || (prices[prices.length - 1] || firstPrice);
       const isPositive = lastPrice >= firstPrice;
 
+      // Buscar posición abierta activa y su pronóstico cuantitativo para este símbolo
+      const activePos = (this.data && this.data.openPositions)
+        ? this.data.openPositions.find(p => (p.symbol || '').trim().toUpperCase() === (symbol || '').trim().toUpperCase())
+        : null;
+      const fc = activePos && activePos.forecast ? activePos.forecast : null;
+
+      // Actualizar badge de probabilidad Kalshi y leyenda de niveles operativos
+      const probBadgeEl = document.getElementById('kalshi-intraday-prob-badge');
+      const legendEl = document.getElementById('kalshi-levels-legend');
+      if (fc) {
+        if (probBadgeEl) {
+          probBadgeEl.style.display = 'inline-block';
+          probBadgeEl.innerText = `⚡ ${fc.kalshiProb || 60}% Prob. Alcista`;
+        }
+        if (legendEl) {
+          legendEl.style.display = this.showChartLevels ? 'flex' : 'none';
+          const chipBuy = document.getElementById('kl-chip-buy');
+          const chipTarget = document.getElementById('kl-chip-target');
+          const chipStop = document.getElementById('kl-chip-stop');
+          const chipAtr = document.getElementById('kl-chip-atr');
+          if (chipBuy) chipBuy.innerText = `🔵 Compra: $${(activePos.buy_price || 0).toFixed(2)}`;
+          if (chipTarget) chipTarget.innerText = `🟢 Objetivo: $${(fc.targetPrice || 0).toFixed(2)}`;
+          if (chipStop) chipStop.innerText = `🔴 ${fc.isTrailingStop ? 'Trailing Stop' : 'Stop ATR'}: $${(fc.suggestedStopLoss || 0).toFixed(2)}`;
+          if (chipAtr) chipAtr.innerText = `📐 Rango 5D (ATR $${fc.atr || 0}): $${fc.expectedLow5d || 0} - $${fc.expectedHigh5d || 0}`;
+        }
+      } else {
+        if (probBadgeEl) probBadgeEl.style.display = 'none';
+        if (legendEl) legendEl.style.display = 'none';
+      }
+
       // Inicializar el Header estilo Kalshi con el precio en vivo actual
       this.updateIntradayKalshiHeader(symbol, lastPrice, firstPrice, `En vivo • ${points[points.length - 1]?.time || ''} NY`);
 
@@ -787,10 +890,22 @@ const app = {
 
       const allLows = points.map(p => p.low || p.price);
       const allHighs = points.map(p => p.high || p.price);
-      const minPrice = Math.min(...allLows, firstPrice);
-      const maxPrice = Math.max(...allHighs, firstPrice);
-      const padding = (maxPrice - minPrice) * 0.08 || 1.0;
+      let minPrice = Math.min(...allLows, firstPrice);
+      let maxPrice = Math.max(...allHighs, firstPrice);
 
+      // Si Niveles (ON) está activo y los niveles operativos están relativamente cerca (dentro del 16% del precio actual), expandir eje Y para visualizarlos directamente en el lienzo
+      if (this.showChartLevels && activePos && fc) {
+        const candidateLevels = [activePos.buy_price, fc.targetPrice, fc.suggestedStopLoss].filter(Boolean);
+        candidateLevels.forEach(lvl => {
+          const distRatio = Math.abs(lvl - lastPrice) / Math.max(1, lastPrice);
+          if (distRatio <= 0.16) {
+            minPrice = Math.min(minPrice, lvl);
+            maxPrice = Math.max(maxPrice, lvl);
+          }
+        });
+      }
+
+      const padding = (maxPrice - minPrice) * 0.08 || 1.0;
       const yMin = Math.floor((minPrice - padding) * 100) / 100;
       const yMax = Math.ceil((maxPrice + padding) * 100) / 100;
 
@@ -814,7 +929,37 @@ const app = {
             ctx.restore();
           }
 
-          // 2. Renderizado de Velas si está en modo Velas
+          // 2. Líneas Horizontales de Niveles Operativos (Compra, Objetivo, Stop/Trailing)
+          if (app.showChartLevels && activePos && fc) {
+            const drawLevelLine = (priceVal, labelText, colorHex) => {
+              if (!priceVal || priceVal < yMin || priceVal > yMax) return;
+              const py = y.getPixelForValue(priceVal);
+              ctx.save();
+              ctx.beginPath();
+              ctx.moveTo(chartArea.left, py);
+              ctx.lineTo(chartArea.right, py);
+              ctx.lineWidth = 1.25;
+              ctx.setLineDash([6, 4]);
+              ctx.strokeStyle = colorHex;
+              ctx.stroke();
+
+              // Etiqueta lateral izquierda sobre la línea
+              ctx.font = '700 10px "JetBrains Mono", Inter, sans-serif';
+              const fullTxt = `${labelText}: $${priceVal.toFixed(2)}`;
+              const txtWidth = ctx.measureText(fullTxt).width;
+              ctx.fillStyle = isDark ? 'rgba(18, 22, 28, 0.88)' : 'rgba(255, 255, 255, 0.90)';
+              ctx.fillRect(chartArea.left + 6, py - 9, txtWidth + 10, 16);
+              ctx.fillStyle = colorHex;
+              ctx.fillText(fullTxt, chartArea.left + 11, py + 3);
+              ctx.restore();
+            };
+
+            drawLevelLine(activePos.buy_price, 'COMPRA', '#2563EB');
+            drawLevelLine(fc.targetPrice, 'OBJETIVO', greenHex);
+            drawLevelLine(fc.suggestedStopLoss, fc.isTrailingStop ? 'TRAILING' : 'STOP', redHex);
+          }
+
+          // 3. Renderizado de Velas si está en modo Velas
           if (app.intradayChartStyle !== 'candle') return;
           const candleWidth = Math.max(4, Math.min(12, Math.floor((chartArea.width / Math.max(points.length, 1)) * 0.6)));
           points.forEach((p, i) => {
@@ -986,7 +1131,7 @@ const app = {
   },
 
   // ==========================================
-  // GRÁFICO HISTÓRICO DE VALOR TOTAL DE CARTERA VS TIEMPO (ESTILO KALSHI)
+  // GRÁFICO HISTÓRICO DE VALOR TOTAL DE CARTERA VS BENCHMARK S&P 500 (ESTILO KALSHI)
   // ==========================================
   updateHistoricalKalshiHeader(totalVal, netGain, dateLabel) {
     const valEl = document.getElementById('kalshi-hist-total-val');
@@ -1021,9 +1166,19 @@ const app = {
       const labels = timeline.map(t => t.date);
       const totalValues = timeline.map(t => t.totalValue);
       const investedValues = timeline.map(t => t.invested);
+      const spyValues = timeline.map(t => t.spyBenchmarkValue || t.invested);
 
       const lastItem = timeline[timeline.length - 1];
       this.updateHistoricalKalshiHeader(lastItem.totalValue, lastItem.netGain, `Actualizado • ${lastItem.date}`);
+
+      // Actualizar badge de Alpha vs S&P 500
+      const alphaBadge = document.getElementById('kalshi-hist-alpha-badge');
+      if (alphaBadge && lastItem.alphaPct !== undefined) {
+        const aSign = lastItem.alphaPct >= 0 ? '+' : '';
+        alphaBadge.innerText = `Alpha vs S&P 500: ${aSign}${lastItem.alphaPct.toFixed(1)}%`;
+        alphaBadge.style.background = lastItem.alphaPct >= 0 ? 'var(--primary-light)' : 'var(--danger-bg)';
+        alphaBadge.style.color = lastItem.alphaPct >= 0 ? 'var(--primary-hover)' : 'var(--danger)';
+      }
 
       const isDark = document.body.classList.contains('dark-theme');
       const greenHex = isDark ? '#28CC95' : '#00B87C';
@@ -1090,11 +1245,23 @@ const app = {
               pointHoverRadius: 6.5
             },
             {
+              label: 'Benchmark S&P 500 (SPY) US$',
+              data: spyValues,
+              borderColor: '#8B5CF6',
+              borderWidth: 2,
+              borderDash: [3, 3],
+              backgroundColor: 'transparent',
+              fill: false,
+              stepped: 'before',
+              pointRadius: 0,
+              pointHoverRadius: 4
+            },
+            {
               label: 'Capital Invertido US$',
               data: investedValues,
               borderColor: '#1D6FF2',
-              borderWidth: 1.8,
-              borderDash: [5, 5],
+              borderWidth: 1.6,
+              borderDash: [6, 5],
               backgroundColor: 'transparent',
               fill: false,
               stepped: 'before',
@@ -1145,6 +1312,9 @@ const app = {
                       `Valor Cartera: $${t.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
                       `Ganancia Real: ${gainSign}$${t.netGain.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
                     ];
+                  }
+                  if (context.datasetIndex === 1) {
+                    return `Benchmark S&P 500: $${(t.spyBenchmarkValue || t.invested).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
                   }
                   return `Invertido: $${t.invested.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
                 }
@@ -1201,12 +1371,12 @@ const app = {
           </td>
           <td>${p.daysHeld}d</td>
           <td>
-            <div onclick="app.openForecastModal(${p.id})" style="cursor: pointer;" title="Haz clic para ver el análisis algorítmico completo">
+            <div onclick="app.openForecastModal(${p.id})" style="cursor: pointer;" title="Haz clic para ver el pronóstico cuantitativo Kalshi y Simulador DCA">
               <span class="${p.forecast.actionColor === 'danger' ? 'badge-down' : (p.forecast.actionColor === 'warning' ? 'badge-neutral' : 'badge-up')}" style="font-size: 11px; padding: 4px 8px;">
-                ${p.forecast.action === 'VENDER' ? '🔴 VENDER' : (p.forecast.action === 'ACUMULAR / MEJORAR' ? '🟡 ACUMULAR' : '🟢 MANTENER')}
+                ${p.forecast.actionColor === 'danger' ? '🔴 ' : (p.forecast.actionColor === 'warning' ? '🟡 ' : '🟢 ')}${p.forecast.action || 'MANTENER'}
               </span>
-              <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px; font-weight: 600;">
-                ⏳ ${p.forecast.horizon}
+              <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px; font-weight: 700; font-family: var(--font-mono);">
+                ⚡ ${p.forecast.kalshiProb || 60}% Prob • 🎯 $${(p.forecast.targetPrice || 0).toFixed(2)} • 1:${p.forecast.riskRewardRatio || 2.0}
               </div>
             </div>
           </td>
@@ -1496,6 +1666,11 @@ const app = {
       badgeElem.innerText = tech.decisionBadge || '🟡 ESPERAR';
       badgeElem.className = tech.decisionColor === 'success' ? 'badge-up' : (tech.decisionColor === 'danger' ? 'badge-down' : 'badge-neutral');
 
+      const kProbElem = document.getElementById('t-hero-kalshi-prob');
+      if (kProbElem) {
+        kProbElem.innerText = `⚡ ${tech.kalshiProb || 60}% Prob. Kalshi`;
+      }
+
       // 2. Tu Balance Personal
       const openContainer = document.getElementById('t-open-container');
       const noOpenContainer = document.getElementById('t-no-open-container');
@@ -1533,11 +1708,11 @@ const app = {
       const tradesListElem = document.getElementById('t-hist-trades-list');
       if (port.closedTrades && port.closedTrades.length > 0) {
         let tHtml = '<table style="width: 100%; border-collapse: collapse; margin-top: 6px;">';
-        tHtml += '<tr style="color: var(--text-muted); border-bottom: 1px solid rgba(255,255,255,0.05); text-align: left;"><th style="padding: 4px;">Fecha Venta</th><th>Cant.</th><th>P. Compra</th><th>P. Venta</th><th style="text-align: right;">Ganancia</th></tr>';
+        tHtml += '<tr style="color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); text-align: left;"><th style="padding: 4px;">Fecha Venta</th><th>Cant.</th><th>P. Compra</th><th>P. Venta</th><th style="text-align: right;">Ganancia</th></tr>';
         port.closedTrades.forEach(tr => {
           const isWin = tr.realized_gain >= 0;
           tHtml += `
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+            <tr style="border-bottom: 1px solid var(--border-subtle);">
               <td style="padding: 4px;">${tr.sell_date || '-'}</td>
               <td>${tr.quantity}</td>
               <td>$${tr.buy_price.toFixed(2)}</td>
@@ -1552,13 +1727,26 @@ const app = {
         tradesListElem.innerHTML = '<div style="color: var(--text-muted); padding: 8px 0; text-align: center;">No registras ventas previas en este ticker.</div>';
       }
 
-      // 3. Indicadores Técnicos
+      // 3. Indicadores Técnicos Multifactoriales
       document.getElementById('t-tech-rsi').innerText = tech.rsi || '50.0';
       const rsiNum = parseFloat(tech.rsi || 50);
-      document.getElementById('t-tech-rsi-status').innerText = rsiNum <= 30 ? '🟢 Sobrevendido (Oportunidad)' : (rsiNum >= 70 ? '🔴 Sobrecomprado (Alerta)' : '🟡 Rango Neutral');
+      document.getElementById('t-tech-rsi-status').innerText = rsiNum <= 32 ? '🟢 Sobreventa' : (rsiNum >= 70 ? '🔴 Sobrecompra' : '🟡 Zona Fuerte');
+      const macdEl = document.getElementById('t-tech-macd');
+      if (macdEl) {
+        const mState = (tech.macd && tech.macd.state) ? tech.macd.state : 'NEUTRAL';
+        macdEl.innerText = mState;
+        macdEl.style.color = mState.includes('ALCISTA') ? 'var(--primary-hover)' : (mState.includes('BAJISTA') ? 'var(--danger)' : 'var(--text-secondary)');
+      }
+      const rvolEl = document.getElementById('t-tech-rvol');
+      if (rvolEl) rvolEl.innerText = `RVOL ${tech.volumeRatio || 1.0}x`;
+      const atrEl = document.getElementById('t-tech-atr');
+      if (atrEl) atrEl.innerText = `$${tech.atr || 0}`;
+      const rrEl = document.getElementById('t-tech-rr');
+      if (rrEl) rrEl.innerText = `R/R 1:${tech.riskRewardRatio || 2.0}`;
+
       document.getElementById('t-tech-sma50').innerText = `$${tech.sma50 || '-'}`;
-      document.getElementById('t-tech-support').innerText = `$${tech.support || '-'}`;
-      document.getElementById('t-tech-resistance').innerText = `$${tech.resistance || '-'}`;
+      document.getElementById('t-tech-support').innerText = `$${tech.atrStopLoss || tech.support || '-'}`;
+      document.getElementById('t-tech-resistance').innerText = `$${tech.atrTakeProfit || tech.resistance || '-'}`;
       document.getElementById('t-tech-reason').innerText = tech.reason || 'Sin datos técnicos disponibles para este activo.';
 
       // 4. Noticias
@@ -1569,12 +1757,12 @@ const app = {
         newsList.slice(0, 3).forEach(n => {
           const sent = n.sentiment || { type: 'neutral', color: '#38bdf8' };
           nHtml += `
-            <div style="background: rgba(255,255,255,0.03); border-left: 3px solid ${sent.color}; padding: 10px 14px; border-radius: 8px;">
+            <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-left: 3px solid ${sent.color}; padding: 10px 14px; border-radius: 8px;">
               <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
                 <span>🏛️ ${n.publisher}</span>
                 <span>🕒 ${n.providerPublishTime}</span>
               </div>
-              <div style="font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 4px;">${n.title}</div>
+              <div style="font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">${n.title}</div>
               <div style="font-size: 11px; color: var(--text-muted);">${n.summary ? n.summary.substring(0, 140) + '...' : ''}</div>
             </div>
           `;
@@ -1653,27 +1841,156 @@ const app = {
     }
   },
 
+  currentForecastPos: null,
+
   openForecastModal(id) {
     const openPositions = this.data ? this.data.openPositions : [];
     const item = openPositions.find(p => Number(p.id) === Number(id));
     if (!item || !item.forecast) return;
 
+    this.currentForecastPos = item;
     const fc = item.forecast;
     document.getElementById('fc-modal-symbol').innerText = fc.symbol;
-    
+
+    // Score de Probabilidad Kalshi y Señales
+    const probValEl = document.getElementById('fc-modal-prob-val');
+    const probBarEl = document.getElementById('fc-modal-prob-bar');
+    const signalsEl = document.getElementById('fc-modal-signals');
+    const rrEl = document.getElementById('fc-modal-rr');
+    const kProb = fc.kalshiProb || 62;
+
+    if (probValEl) {
+      probValEl.innerText = `${kProb}%`;
+      probValEl.style.color = kProb >= 60 ? 'var(--primary)' : (kProb < 42 ? 'var(--danger)' : 'var(--warning)');
+    }
+    if (probBarEl) {
+      probBarEl.style.width = `${kProb}%`;
+    }
+    if (rrEl) {
+      rrEl.innerText = `1 : ${fc.riskRewardRatio || 2.0}`;
+    }
+    if (signalsEl) {
+      const sigs = Array.isArray(fc.signals) ? fc.signals : [];
+      signalsEl.innerHTML = sigs.map(s => `<span class="kalshi-signal-tag">${s}</span>`).join('');
+    }
+
     const actionElem = document.getElementById('fc-modal-action');
     actionElem.innerText = fc.action;
     actionElem.className = fc.actionColor === 'danger' ? 'text-danger' : (fc.actionColor === 'warning' ? 'text-warning' : 'text-success');
 
     document.getElementById('fc-modal-horizon').innerText = fc.horizon;
-    document.getElementById('fc-modal-target-price').innerText = `$${fc.targetPrice.toFixed(2)}`;
-    document.getElementById('fc-modal-target-return').innerText = `+${fc.targetReturn.toFixed(1)}% Retorno Esperado`;
-    document.getElementById('fc-modal-current').innerText = `$${fc.currentPrice.toFixed(2)}`;
-    document.getElementById('fc-modal-buy').innerText = `Precio Compra: $${fc.buyPrice.toFixed(2)} (${fc.returnPercent >= 0 ? '+' : ''}${fc.returnPercent.toFixed(1)}%)`;
+    const atrRangeEl = document.getElementById('fc-modal-atr-range');
+    if (atrRangeEl) {
+      atrRangeEl.innerText = `Rango 5D (ATR $${fc.atr || 0}): $${fc.expectedLow5d || 0} - $${fc.expectedHigh5d || 0}`;
+    }
+
+    document.getElementById('fc-modal-target-price').innerText = `$${(fc.targetPrice || 0).toFixed(2)}`;
+    document.getElementById('fc-modal-target-return').innerText = `${fc.targetReturn >= 0 ? '+' : ''}${fc.targetReturn.toFixed(1)}% vs Compra (+${(fc.upsidePercent || 0).toFixed(1)}% hoy)`;
+    document.getElementById('fc-modal-current').innerText = `$${(fc.currentPrice || 0).toFixed(2)}`;
+    document.getElementById('fc-modal-buy').innerText = `Compra: $${(fc.buyPrice || 0).toFixed(2)} (${fc.returnPercent >= 0 ? '+' : ''}${fc.returnPercent.toFixed(1)}%)`;
+
+    const stopLblEl = document.getElementById('fc-modal-stop-label');
+    const stopPriceEl = document.getElementById('fc-modal-stop-price');
+    const stopDistEl = document.getElementById('fc-modal-stop-dist');
+    if (stopLblEl) {
+      stopLblEl.innerText = fc.isTrailingStop ? '🔒 Trailing Stop (Protege Ganancia)' : '🛡️ Stop Loss Dinámico (ATR)';
+    }
+    if (stopPriceEl) {
+      stopPriceEl.innerText = `$${(fc.suggestedStopLoss || 0).toFixed(2)}`;
+    }
+    if (stopDistEl) {
+      stopDistEl.innerText = `-${(fc.downsidePercent || 0).toFixed(1)}% desde precio actual`;
+    }
+
     document.getElementById('fc-modal-reason').innerText = fc.reason;
+
+    // Inicializar Simulador DCA con +$100
+    const dcaInput = document.getElementById('fc-dca-input');
+    if (dcaInput) dcaInput.value = 100;
+    this.updateDcaSimulation();
 
     document.getElementById('modal-forecast').classList.add('active');
   },
+
+  setDcaAmount(amount) {
+    const dcaInput = document.getElementById('fc-dca-input');
+    if (dcaInput) {
+      dcaInput.value = amount;
+      this.updateDcaSimulation();
+    }
+  },
+
+  updateDcaSimulation() {
+    const pos = this.currentForecastPos;
+    if (!pos) return;
+    const fc = pos.forecast || {};
+
+    const addUsd = Math.max(0, parseFloat(document.getElementById('fc-dca-input')?.value) || 0);
+    const livePrice = parseFloat(pos.livePrice || fc.currentPrice || pos.buy_price || 1);
+    const oldShares = parseFloat(pos.quantity || 0);
+    const oldInvested = parseFloat(pos.buy_total || (oldShares * pos.buy_price) || 0);
+    const oldAvg = parseFloat(pos.buy_price || livePrice);
+    const targetPrice = parseFloat(fc.targetPrice || livePrice * 1.12);
+
+    const addedShares = livePrice > 0 ? addUsd / livePrice : 0;
+    const newTotalShares = oldShares + addedShares;
+    const newTotalInvested = oldInvested + addUsd;
+    const newAvgPrice = newTotalShares > 0 ? newTotalInvested / newTotalShares : oldAvg;
+
+    const avgDiff = newAvgPrice - oldAvg;
+    const breakEvenDistPct = livePrice > 0 ? ((newAvgPrice - livePrice) / livePrice) * 100 : 0;
+    const valueAtTarget = newTotalShares * targetPrice;
+    const gainAtTarget = valueAtTarget - newTotalInvested;
+    const gainAtTargetPct = newTotalInvested > 0 ? (gainAtTarget / newTotalInvested) * 100 : 0;
+
+    const addedShEl = document.getElementById('fc-dca-added-shares');
+    const newAvgEl = document.getElementById('fc-dca-new-avg');
+    const avgDiffEl = document.getElementById('fc-dca-avg-diff');
+    const bePctEl = document.getElementById('fc-dca-breakeven-pct');
+    const tGainEl = document.getElementById('fc-dca-target-gain');
+    const tPctEl = document.getElementById('fc-dca-target-pct');
+
+    if (addedShEl) addedShEl.innerText = `+${addedShares.toFixed(4)} acc nuevas (Total: ${newTotalShares.toFixed(4)})`;
+    if (newAvgEl) newAvgEl.innerText = `$${newAvgPrice.toFixed(2)}`;
+    if (avgDiffEl) {
+      if (Math.abs(avgDiff) < 0.01) {
+        avgDiffEl.innerText = `Sin cambio vs $${oldAvg.toFixed(2)}`;
+      } else {
+        avgDiffEl.innerText = `${avgDiff < 0 ? 'Baja ' : 'Sube '}${avgDiff >= 0 ? '+' : ''}$${avgDiff.toFixed(2)} (era $${oldAvg.toFixed(2)})`;
+      }
+    }
+    if (bePctEl) {
+      if (breakEvenDistPct <= 0) {
+        bePctEl.innerText = `En Ganancia (+${Math.abs(breakEvenDistPct).toFixed(1)}%)`;
+        bePctEl.style.color = 'var(--primary-hover)';
+      } else {
+        bePctEl.innerText = `+${breakEvenDistPct.toFixed(1)}% requerido`;
+        bePctEl.style.color = 'var(--accent-blue)';
+      }
+    }
+    if (tGainEl) {
+      const gSign = gainAtTarget >= 0 ? '+' : '';
+      tGainEl.innerText = `${gSign}$${gainAtTarget.toFixed(2)}`;
+    }
+    if (tPctEl) {
+      const pSign = gainAtTargetPct >= 0 ? '+' : '';
+      tPctEl.innerText = `${pSign}${gainAtTargetPct.toFixed(1)}% en $${targetPrice.toFixed(2)}`;
+    }
+  },
+
+  viewCurrentForecastOnChart() {
+    const pos = this.currentForecastPos;
+    this.closeForecastModal();
+    if (!pos) return;
+    this.switchTab('dashboard');
+    this.showChartLevels = true;
+    const selectElem = document.getElementById('chart-stock-select');
+    if (selectElem) selectElem.value = pos.symbol;
+    this.changeIntradaySymbol(pos.symbol);
+    const chartCard = document.getElementById('chart-intraday-line');
+    if (chartCard) chartCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  },
+
   closeForecastModal() {
     document.getElementById('modal-forecast').classList.remove('active');
   },

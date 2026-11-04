@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   
   <!-- CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=2.9.0">
+  <link rel="stylesheet" href="/css/styles.css?v=3.0.0">
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -135,6 +135,42 @@
         </div>
       </div>
 
+      <!-- BARRA CUANTITATIVA KALSHI: SALUD DE CARTERA, PROBABILIDAD ALCISTA Y CONCENTRACIÓN -->
+      <div class="kalshi-quant-bar" id="kalshi-quant-bar">
+        <div class="kalshi-quant-item">
+          <div class="kalshi-quant-label">⚡ PROBABILIDAD ALCISTA CARTERA (KALSHI SCORE)</div>
+          <div class="kalshi-quant-value-row">
+            <span class="kalshi-quant-big" id="kq-portfolio-prob">64%</span>
+            <div class="kalshi-prob-meter">
+              <div class="kalshi-prob-fill" id="kq-portfolio-prob-bar" style="width: 64%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="kalshi-quant-item">
+          <div class="kalshi-quant-label">🏆 MAYOR CONVICCIÓN TÉCNICA</div>
+          <div class="kalshi-quant-value-row">
+            <span class="kalshi-quant-ticker" id="kq-top-conviction">-</span>
+            <span class="kalshi-quant-pill pill-up" id="kq-top-conviction-prob">0% Prob.</span>
+          </div>
+        </div>
+
+        <div class="kalshi-quant-item">
+          <div class="kalshi-quant-label">⚖️ EXPOSICIÓN MÁXIMA / CONCENTRACIÓN</div>
+          <div class="kalshi-quant-value-row">
+            <span class="kalshi-quant-ticker" id="kq-max-conc-symbol">-</span>
+            <span class="kalshi-quant-pill" id="kq-max-conc-pct">0.0%</span>
+          </div>
+        </div>
+
+        <div class="kalshi-quant-item">
+          <div class="kalshi-quant-label">🛡️ SEMÁFORO DE SALUD CUANTITATIVA</div>
+          <div class="kalshi-quant-value-row">
+            <span class="kalshi-quant-pill pill-up" id="kq-health-badge">🟢 ÓPTIMA</span>
+          </div>
+        </div>
+      </div>
+
       <!-- SECCIÓN DEDICADA: DECK DE POSICIONES ABIERTAS ACTIVAS (CARDS INTERACTIVAS) -->
       <div class="active-holdings-section" style="margin-bottom: 28px;">
         <div class="section-header-row">
@@ -168,11 +204,19 @@
                 <span class="kalshi-live-dot" id="kalshi-intraday-dot"></span>
                 <span id="kalshi-intraday-ticker-title">TSLA • EVOLUCIÓN DE MERCADO</span>
                 <span id="chart-info-badge" class="kalshi-tf-badge">15 Minutos</span>
+                <span id="kalshi-intraday-prob-badge" class="kalshi-tf-badge" style="background: var(--primary-light); color: var(--primary-hover);">--% Prob. Alcista</span>
               </div>
               <div class="kalshi-price-hero-row">
                 <span class="kalshi-big-price" id="kalshi-live-price">$0.00</span>
                 <span class="kalshi-price-delta pill-up" id="kalshi-live-delta">+0.00 (+0.00%)</span>
                 <span class="kalshi-hover-time" id="kalshi-hover-timestamp">En vivo</span>
+              </div>
+              <!-- Leyenda de Niveles Operativos Activos en el Gráfico -->
+              <div class="kalshi-levels-legend" id="kalshi-levels-legend" style="display: none;">
+                <span class="kalshi-level-chip level-buy" id="kl-chip-buy">Compra: $0.00</span>
+                <span class="kalshi-level-chip level-target" id="kl-chip-target">Objetivo: $0.00</span>
+                <span class="kalshi-level-chip level-stop" id="kl-chip-stop">Stop/Trailing: $0.00</span>
+                <span class="kalshi-level-chip level-atr" id="kl-chip-atr">Rango 5D (ATR): $0 - $0</span>
               </div>
             </div>
 
@@ -185,7 +229,7 @@
                 </select>
               </div>
 
-              <!-- Selector de Estilo de Gráfico (Escalón Kalshi / Curva / Velas / Vol) -->
+              <!-- Selector de Estilo de Gráfico (Escalón Kalshi / Curva / Velas / Niveles / Vol) -->
               <div class="kalshi-style-pill-group">
                 <button type="button" id="btn-chart-style-step" class="btn-kalshi-style active" onclick="app.setChartStyle('step')" title="Línea Escalonada estilo Kalshi">
                   ⚡ Kalshi
@@ -195,6 +239,9 @@
                 </button>
                 <button type="button" id="btn-chart-style-candle" class="btn-kalshi-style" onclick="app.setChartStyle('candle')" title="Velas Japonesas">
                   🕯️ Velas
+                </button>
+                <button type="button" id="btn-chart-levels" class="btn-kalshi-style active" onclick="app.toggleChartLevels()" title="Mostrar/Ocultar Niveles de Compra, Objetivo y Stop Loss en el Gráfico">
+                  🎯 Niveles (<span id="levels-status-text">ON</span>)
                 </button>
                 <button type="button" id="btn-chart-volume" class="btn-kalshi-style active" onclick="app.toggleVolume()" title="Mostrar/Ocultar Volumen">
                   📊 Vol (<span id="volume-status-text">ON</span>)
@@ -219,18 +266,19 @@
               <button type="button" id="btn-tf-1m" class="kalshi-tf-btn" onclick="app.setTimeframe('1m')">1M</button>
             </div>
             <div class="kalshi-chart-watermark">
-              <span>KALSHI ENGINE • DATOS EN VIVO</span>
+              <span>KALSHI QUANT ENGINE • ATR & NIVELES EN VIVO</span>
             </div>
           </div>
         </div>
 
-        <!-- CARD 2: GRÁFICO HISTÓRICO DE LA CARTERA ESTILO KALSHI -->
+        <!-- CARD 2: GRÁFICO HISTÓRICO DE LA CARTERA ESTILO KALSHI + BENCHMARK S&P 500 -->
         <div class="card kalshi-chart-card" style="margin-bottom: 24px;">
           <div class="kalshi-chart-header">
             <div class="kalshi-chart-title-group">
               <div class="kalshi-eyebrow">
                 <span class="kalshi-live-dot"></span>
-                <span>VALOR TOTAL DE LA CARTERA VS TIEMPO</span>
+                <span>VALOR DE LA CARTERA VS BENCHMARK S&P 500 (SPY)</span>
+                <span id="kalshi-hist-alpha-badge" class="kalshi-tf-badge" style="background: var(--primary-light); color: var(--primary-hover);">Alpha vs S&P 500: +0.0%</span>
               </div>
               <div class="kalshi-price-hero-row">
                 <span class="kalshi-big-price" id="kalshi-hist-total-val">$0.00</span>
@@ -643,49 +691,122 @@
     </div>
   </div>
 
-  <!-- MODAL: PRONÓSTICO & RECOMENDACIÓN ALGORÍTMICA -->
+  <!-- MODAL: PRONÓSTICO CUANTITATIVO KALSHI & SIMULADOR DCA -->
   <div class="modal-backdrop" id="modal-forecast">
-    <div class="modal-box" style="max-width: 620px;">
+    <div class="modal-box" style="max-width: 680px; max-height: 92vh; overflow-y: auto;">
       <div class="modal-header">
-        <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
-          <span>🤖 Pronóstico & Recomendación Algorítmica</span>
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span>⚡ Inteligencia Cuantitativa Kalshi & DCA</span>
           <span class="brand-badge" id="fc-modal-symbol">TSLA</span>
         </div>
         <button class="modal-close" onclick="app.closeForecastModal()">✕</button>
       </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
-        <div style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+      <!-- Barra de Probabilidad Alcista Estilo Contrato Kalshi -->
+      <div class="kalshi-modal-prob-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">PROBABILIDAD ALCISTA MULTIFACTORIAL (KALSHI SCORE)</div>
+            <div style="display: flex; align-items: baseline; gap: 10px; margin-top: 2px;">
+              <span id="fc-modal-prob-val" style="font-family: var(--font-display); font-size: 32px; font-weight: 800; color: var(--primary);">74%</span>
+              <span id="fc-modal-signals" style="display: flex; gap: 6px; flex-wrap: wrap;"></span>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Relación Riesgo / Beneficio</div>
+            <div id="fc-modal-rr" style="font-family: var(--font-mono); font-size: 18px; font-weight: 800; color: var(--text-main);">1 : 2.5</div>
+          </div>
+        </div>
+        <div class="kalshi-prob-meter" style="height: 10px; width: 100%;">
+          <div class="kalshi-prob-fill" id="fc-modal-prob-bar" style="width: 74%;"></div>
+        </div>
+      </div>
+
+      <!-- Decisión y Horizonte -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+        <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: 10px; border: 1px solid var(--border-color);">
           <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Recomendación Táctica</div>
-          <div id="fc-modal-action" style="font-size: 20px; font-weight: 800; margin-top: 4px;">MANTENER</div>
+          <div id="fc-modal-action" style="font-size: 17px; font-weight: 800; margin-top: 4px;">MANTENER</div>
         </div>
 
-        <div style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color);">
-          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Horizonte Estimado</div>
-          <div id="fc-modal-horizon" style="font-size: 18px; font-weight: 800; color: #60a5fa; margin-top: 4px;">2 a 3 Semanas</div>
-        </div>
-      </div>
-
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
-        <div style="background: rgba(16,185,129,0.08); padding: 14px; border-radius: 10px; border: 1px solid rgba(16,185,129,0.3);">
-          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Precio Objetivo Estimado</div>
-          <div id="fc-modal-target-price" style="font-size: 18px; font-weight: 800; color: #10b981;">$345.00</div>
-          <div id="fc-modal-target-return" style="font-size: 12px; color: #10b981; font-weight: 600;">+12.0% Retorno Esperado</div>
-        </div>
-
-        <div style="background: rgba(59,130,246,0.08); padding: 14px; border-radius: 10px; border: 1px solid rgba(59,130,246,0.3);">
-          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Precio Actual vs Compra</div>
-          <div id="fc-modal-current" style="font-size: 18px; font-weight: 800; color: #fff;">$306.79</div>
-          <div id="fc-modal-buy" style="font-size: 12px; color: var(--text-muted);">Comprado a $426.61</div>
+        <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: 10px; border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Horizonte & Rango 5D (ATR)</div>
+          <div id="fc-modal-horizon" style="font-size: 16px; font-weight: 800; color: var(--accent-blue); margin-top: 4px;">2 a 3 Semanas</div>
+          <div id="fc-modal-atr-range" style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px;">Rango 5D: $0 - $0</div>
         </div>
       </div>
 
-      <div style="background: rgba(0,0,0,0.3); border-left: 4px solid var(--primary); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
-        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Análisis & Razonamiento Algorítmico</div>
-        <p id="fc-modal-reason" style="font-size: 14px; color: var(--text-main); line-height: 1.6;"></p>
+      <!-- Niveles Operativos: Objetivo, Actual/Compra, Stop/Trailing -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;">
+        <div style="background: var(--primary-light); padding: 12px; border-radius: 10px; border: 1px solid rgba(10, 194, 133, 0.35);">
+          <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">🎯 Objetivo (Take Profit)</div>
+          <div id="fc-modal-target-price" style="font-family: var(--font-mono); font-size: 17px; font-weight: 800; color: var(--primary-hover); margin-top: 2px;">$345.00</div>
+          <div id="fc-modal-target-return" style="font-size: 11px; color: var(--primary-hover); font-weight: 700;">+12.0% Retorno</div>
+        </div>
+
+        <div style="background: var(--bg-surface-elevated); padding: 12px; border-radius: 10px; border: 1px solid var(--border-color);">
+          <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">💵 Actual vs Compra</div>
+          <div id="fc-modal-current" style="font-family: var(--font-mono); font-size: 17px; font-weight: 800; color: var(--text-main); margin-top: 2px;">$306.79</div>
+          <div id="fc-modal-buy" style="font-size: 11px; color: var(--text-muted);">Compra: $426.61</div>
+        </div>
+
+        <div style="background: var(--danger-bg); padding: 12px; border-radius: 10px; border: 1px solid rgba(217, 45, 32, 0.3);">
+          <div id="fc-modal-stop-label" style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">🛡️ Stop Dinámico (ATR)</div>
+          <div id="fc-modal-stop-price" style="font-family: var(--font-mono); font-size: 17px; font-weight: 800; color: var(--danger); margin-top: 2px;">$285.00</div>
+          <div id="fc-modal-stop-dist" style="font-size: 11px; color: var(--danger); font-weight: 600;">Riesgo controlado</div>
+        </div>
       </div>
 
-      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+      <!-- Razonamiento Cuantitativo -->
+      <div style="background: var(--bg-surface-elevated); border-left: 4px solid var(--primary); padding: 14px; border-radius: 8px; margin-bottom: 16px;">
+        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Diagnóstico Algorítmico Multifactorial</div>
+        <p id="fc-modal-reason" style="font-size: 13.5px; color: var(--text-main); line-height: 1.55; margin: 0;"></p>
+      </div>
+
+      <!-- SIMULADOR INTERACTIVO DE PROMEDIAR / ACUMULAR POSICIÓN (DCA) -->
+      <div class="kalshi-dca-box" id="fc-dca-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+          <div>
+            <div style="font-size: 12px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+              <span>🧮 Simulador Interactivo de Promediar / Acumular (DCA)</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted);">Simula cuánto baja tu precio promedio si compras más acciones hoy al precio de mercado:</div>
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" class="btn-kalshi-style" onclick="app.setDcaAmount(50)">+$50</button>
+            <button type="button" class="btn-kalshi-style active" onclick="app.setDcaAmount(100)">+$100</button>
+            <button type="button" class="btn-kalshi-style" onclick="app.setDcaAmount(250)">+$250</button>
+            <button type="button" class="btn-kalshi-style" onclick="app.setDcaAmount(500)">+$500</button>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+          <label style="font-size: 12px; font-weight: 700; color: var(--text-secondary);">Inversión Adicional US$:</label>
+          <input type="number" step="10" min="0" id="fc-dca-input" class="form-input" value="100" style="width: 130px; padding: 6px 10px; font-family: var(--font-mono); font-weight: 700;" oninput="app.updateDcaSimulation()">
+          <span id="fc-dca-added-shares" style="font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);">+0.0000 acciones nuevas</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 10px;">
+          <div style="background: var(--bg-surface); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 10px; color: var(--text-muted); font-weight: 700;">NUEVO P. PROMEDIO</div>
+            <div id="fc-dca-new-avg" style="font-family: var(--font-mono); font-size: 16px; font-weight: 800; color: var(--text-main); margin-top: 2px;">$0.00</div>
+            <div id="fc-dca-avg-diff" style="font-size: 11px; color: var(--primary-hover); font-weight: 600;">Mejora precio</div>
+          </div>
+          <div style="background: var(--bg-surface); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 10px; color: var(--text-muted); font-weight: 700;">DISTANCIA A BREAK-EVEN</div>
+            <div id="fc-dca-breakeven-pct" style="font-family: var(--font-mono); font-size: 16px; font-weight: 800; color: var(--accent-blue); margin-top: 2px;">0.0%</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Para empatar</div>
+          </div>
+          <div style="background: var(--bg-surface); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 10px; color: var(--text-muted); font-weight: 700;">GANANCIA EN OBJETIVO</div>
+            <div id="fc-dca-target-gain" style="font-family: var(--font-mono); font-size: 16px; font-weight: 800; color: var(--primary-hover); margin-top: 2px;">+$0.00</div>
+            <div id="fc-dca-target-pct" style="font-size: 11px; color: var(--primary-hover); font-weight: 600;">+0.0% total</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap;">
+        <button type="button" class="btn btn-secondary" onclick="app.viewCurrentForecastOnChart()">📈 Ver Niveles en Gráfico Kalshi</button>
         <button type="button" class="btn btn-primary" onclick="app.closeForecastModal()">Entendido / Cerrar</button>
       </div>
     </div>
@@ -704,21 +825,21 @@
       </div>
 
       <div style="margin-bottom: 16px;">
-        <h3 id="news-modal-title" style="font-size: 17px; font-weight: 700; color: #fff; line-height: 1.4; margin-bottom: 10px;"></h3>
-        <div style="font-size: 12px; color: var(--text-muted); display: flex; gap: 16px; flex-wrap: wrap; align-items: center; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px;">
-          <span>🏛️ Fuente: <strong id="news-modal-publisher" style="color: #38bdf8;"></strong></span>
+        <h3 id="news-modal-title" style="font-size: 17px; font-weight: 700; color: var(--text-main); line-height: 1.4; margin-bottom: 10px;"></h3>
+        <div style="font-size: 12px; color: var(--text-muted); display: flex; gap: 16px; flex-wrap: wrap; align-items: center; background: var(--bg-surface-elevated); padding: 8px 12px; border-radius: 8px;">
+          <span>🏛️ Fuente: <strong id="news-modal-publisher" style="color: var(--accent-blue);"></strong></span>
           <span>🕒 Publicado: <span id="news-modal-time" style="color: var(--text-main);"></span></span>
         </div>
       </div>
 
-      <div style="background: rgba(0,0,0,0.3); border-left: 4px solid var(--primary); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+      <div style="background: var(--bg-surface-elevated); border-left: 4px solid var(--primary); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
         <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
           <span>📋 Hechos y Datos Reportados</span>
         </div>
         <p id="news-modal-summary" style="font-size: 14px; color: var(--text-main); line-height: 1.6; margin: 0;"></p>
       </div>
 
-      <div id="news-modal-impact-container" style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); padding: 14px; border-radius: 8px; margin-bottom: 20px;">
+      <div id="news-modal-impact-container" style="background: var(--primary-light); border: 1px solid rgba(10, 194, 133, 0.25); padding: 14px; border-radius: 8px; margin-bottom: 20px;">
         <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; color: var(--text-muted);">
           💡 Lectura Táctica para la Cartera
         </div>
@@ -726,7 +847,7 @@
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <a id="news-modal-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #38bdf8; text-decoration: none;">
+        <a id="news-modal-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--accent-blue); text-decoration: none;">
           <span>🌐 Abrir Artículo Completo en la Fuente Original</span> ↗
         </a>
         <button type="button" class="btn btn-primary" onclick="app.closeNewsModal()">Cerrar</button>
@@ -745,38 +866,38 @@
         <button class="modal-close" onclick="app.closeTechnicalModal()">✕</button>
       </div>
 
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: rgba(0,0,0,0.3); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-color);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--bg-surface-elevated); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-color);">
         <div>
-          <div id="ta-modal-name" style="font-size: 15px; font-weight: 700; color: #fff;"></div>
-          <div style="font-size: 12px; color: var(--text-muted);">Cotización Actual: <strong id="ta-modal-price" style="color: #60a5fa;"></strong></div>
+          <div id="ta-modal-name" style="font-size: 15px; font-weight: 700; color: var(--text-main);"></div>
+          <div style="font-size: 12px; color: var(--text-muted);">Cotización Actual: <strong id="ta-modal-price" style="color: var(--accent-blue);"></strong></div>
         </div>
         <div id="ta-modal-badge" class="badge-up" style="font-size: 13px; padding: 6px 14px; font-weight: bold;"></div>
       </div>
 
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px;">
-        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+        <div style="background: var(--bg-surface-elevated); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
           <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">RSI (14d)</div>
           <div id="ta-modal-rsi" style="font-size: 18px; font-weight: 800; margin-top: 4px;"></div>
         </div>
-        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+        <div style="background: var(--bg-surface-elevated); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
           <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Media SMA 50</div>
-          <div id="ta-modal-sma50" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: #38bdf8;"></div>
+          <div id="ta-modal-sma50" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: var(--accent-blue);"></div>
         </div>
-        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+        <div style="background: var(--bg-surface-elevated); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
           <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Media SMA 200</div>
-          <div id="ta-modal-sma200" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: #a855f7;"></div>
+          <div id="ta-modal-sma200" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: #7c3aed;"></div>
         </div>
-        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+        <div style="background: var(--bg-surface-elevated); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
           <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Soporte Clave</div>
-          <div id="ta-modal-support" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: #10b981;"></div>
+          <div id="ta-modal-support" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: var(--primary-hover);"></div>
         </div>
-        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+        <div style="background: var(--bg-surface-elevated); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
           <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Resistencia Clave</div>
-          <div id="ta-modal-resistance" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: #ef4444;"></div>
+          <div id="ta-modal-resistance" style="font-size: 18px; font-weight: 800; margin-top: 4px; color: var(--danger);"></div>
         </div>
       </div>
 
-      <div style="background: rgba(0,0,0,0.3); border-left: 4px solid var(--primary); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+      <div style="background: var(--bg-surface-elevated); border-left: 4px solid var(--primary); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
         <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Fundamento & Análisis de Decisión Táctica</div>
         <p id="ta-modal-reason" style="font-size: 14px; color: var(--text-main); line-height: 1.6;"></p>
       </div>
@@ -982,15 +1103,16 @@
       <!-- Contenido del Análisis -->
       <div id="t-analyzer-content" style="padding-top: 16px;">
         <!-- Hero del Ticker -->
-        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
           <div style="display: flex; align-items: center; gap: 14px;">
-            <div id="t-hero-avatar" style="width: 52px; height: 52px; border-radius: 12px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-weight: 800; font-size: 18px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(56, 189, 248, 0.3);">
+            <div id="t-hero-avatar" style="width: 52px; height: 52px; border-radius: 12px; background: var(--primary-light); color: var(--primary-hover); font-weight: 800; font-size: 18px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(10, 194, 133, 0.3);">
               AMD
             </div>
             <div>
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <h2 id="t-hero-symbol" style="margin: 0; font-size: 22px; font-weight: 800; color: #fff;">AMD</h2>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <h2 id="t-hero-symbol" style="margin: 0; font-size: 22px; font-weight: 800; color: var(--text-main);">AMD</h2>
                 <span id="t-hero-signal-badge" class="badge-up" style="font-size: 12px; padding: 4px 10px; font-weight: bold;">🟢 COMPRA TÁCTICA</span>
+                <span id="t-hero-kalshi-prob" class="kalshi-tf-badge" style="background: var(--primary-light); color: var(--primary-hover);">70% Prob. Kalshi</span>
               </div>
               <div id="t-hero-name" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Advanced Micro Devices, Inc.</div>
             </div>
@@ -998,8 +1120,8 @@
 
           <div style="text-align: right;">
             <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Precio en Tiempo Real</div>
-            <div id="t-hero-price" style="font-size: 26px; font-weight: 800; color: #fff;">$0.00</div>
-            <div id="t-hero-change" style="font-size: 13px; font-weight: 700; color: #10b981;">+$0.00 (+0.00%)</div>
+            <div id="t-hero-price" style="font-size: 26px; font-weight: 800; color: var(--text-main); font-family: var(--font-mono);">$0.00</div>
+            <div id="t-hero-change" style="font-size: 13px; font-weight: 700; color: var(--primary);">+$0.00 (+0.00%)</div>
           </div>
         </div>
 
@@ -1007,26 +1129,26 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; margin-bottom: 20px;">
           
           <!-- Card: Tu Balance & Historial Personal en este Ticker -->
-          <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px;">
-            <div style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+          <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px;">
+            <div style="font-size: 12px; font-weight: 700; color: var(--accent-blue); text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
               <span>💼 Tu Balance Personal en este Ticker</span>
             </div>
 
             <!-- Estado de Posición Abierta -->
-            <div id="t-open-container" style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+            <div id="t-open-container" style="background: var(--primary-light); border: 1px solid rgba(10, 194, 133, 0.25); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 12px; font-weight: 700; color: #10b981;">🟢 Posición Abierta Activa</span>
+                <span style="font-size: 12px; font-weight: 700; color: var(--primary-hover);">🟢 Posición Abierta Activa</span>
                 <span id="t-open-qty" style="font-size: 12px; color: var(--text-muted);">0.00 acciones</span>
               </div>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; font-size: 12px;">
-                <div>Precio Compra: <strong id="t-open-buy-price" style="color: #fff;">$0.00</strong></div>
-                <div>Valor Presente: <strong id="t-open-curr-val" style="color: #fff;">$0.00</strong></div>
+                <div>Precio Compra: <strong id="t-open-buy-price" style="color: var(--text-main);">$0.00</strong></div>
+                <div>Valor Presente: <strong id="t-open-curr-val" style="color: var(--text-main);">$0.00</strong></div>
                 <div style="grid-column: span 2;">
-                  Ganancia Flotante: <strong id="t-open-gain" style="font-weight: 800; color: #10b981;">+$0.00 (+0.0%)</strong>
+                  Ganancia Flotante: <strong id="t-open-gain" style="font-weight: 800; color: var(--primary-hover);">+$0.00 (+0.0%)</strong>
                 </div>
               </div>
             </div>
-            <div id="t-no-open-container" style="display: none; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; margin-bottom: 14px; font-size: 12px; color: var(--text-muted); text-align: center;">
+            <div id="t-no-open-container" style="display: none; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; margin-bottom: 14px; font-size: 12px; color: var(--text-muted); text-align: center;">
               No tienes posición abierta activa en este ticker actualmente.
             </div>
 
@@ -1035,17 +1157,17 @@
               Historial de Ventas Realizadas
             </div>
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin-bottom: 12px;">
-              <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px;">
+              <div style="background: var(--bg-surface); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
                 <div style="font-size: 10px; color: var(--text-muted);">Ventas</div>
-                <div id="t-hist-count" style="font-size: 14px; font-weight: 700; color: #fff;">0</div>
+                <div id="t-hist-count" style="font-size: 14px; font-weight: 700; color: var(--text-main);">0</div>
               </div>
-              <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px;">
+              <div style="background: var(--bg-surface); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
                 <div style="font-size: 10px; color: var(--text-muted);">Ganancia Realizada</div>
-                <div id="t-hist-gain" style="font-size: 14px; font-weight: 800; color: #10b981;">+$0.00</div>
+                <div id="t-hist-gain" style="font-size: 14px; font-weight: 800; color: var(--primary-hover);">+$0.00</div>
               </div>
-              <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px;">
+              <div style="background: var(--bg-surface); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
                 <div style="font-size: 10px; color: var(--text-muted);">Win Rate</div>
-                <div id="t-hist-winrate" style="font-size: 14px; font-weight: 800; color: #10b981;">100%</div>
+                <div id="t-hist-winrate" style="font-size: 14px; font-weight: 800; color: var(--primary-hover);">100%</div>
               </div>
             </div>
 
@@ -1056,35 +1178,45 @@
           </div>
 
           <!-- Card: Indicadores Técnicos & Decisión Táctica -->
-          <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px;">
-            <div style="font-size: 12px; font-weight: 700; color: #a855f7; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+          <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px;">
+            <div style="font-size: 12px; font-weight: 700; color: #7c3aed; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
               <span>🎯 Indicadores Cuantitativos & Algoritmo</span>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px;">
-              <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; text-align: center;">
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px;">
+              <div style="background: var(--bg-surface); padding: 9px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
                 <div style="font-size: 10px; color: var(--text-muted);">RSI (14d)</div>
-                <div id="t-tech-rsi" style="font-size: 18px; font-weight: 800; color: #60a5fa; margin-top: 2px;">50.0</div>
+                <div id="t-tech-rsi" style="font-size: 16px; font-weight: 800; color: var(--accent-blue); margin-top: 2px;">50.0</div>
                 <div id="t-tech-rsi-status" style="font-size: 10px; color: var(--text-muted);">Neutral</div>
               </div>
-              <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 10px; color: var(--text-muted);">Media SMA 50d</div>
-                <div id="t-tech-sma50" style="font-size: 18px; font-weight: 800; color: #38bdf8; margin-top: 2px;">$0.00</div>
-                <div style="font-size: 10px; color: var(--text-muted);">Corto Plazo</div>
+              <div style="background: var(--bg-surface); padding: 9px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+                <div style="font-size: 10px; color: var(--text-muted);">MACD (12,26,9)</div>
+                <div id="t-tech-macd" style="font-size: 13px; font-weight: 800; color: var(--primary-hover); margin-top: 4px;">ALCISTA</div>
+                <div id="t-tech-rvol" style="font-size: 10px; color: var(--text-muted);">RVOL 1.0x</div>
               </div>
-              <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 10px; color: var(--text-muted);">Soporte Clave</div>
-                <div id="t-tech-support" style="font-size: 18px; font-weight: 800; color: #10b981; margin-top: 2px;">$0.00</div>
+              <div style="background: var(--bg-surface); padding: 9px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+                <div style="font-size: 10px; color: var(--text-muted);">ATR (14d Volat.)</div>
+                <div id="t-tech-atr" style="font-size: 16px; font-weight: 800; color: var(--text-main); margin-top: 2px;">$0.00</div>
+                <div id="t-tech-rr" style="font-size: 10px; color: var(--text-muted);">R/R 1:2.0</div>
+              </div>
+              <div style="background: var(--bg-surface); padding: 9px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+                <div style="font-size: 10px; color: var(--text-muted);">Media SMA 50d</div>
+                <div id="t-tech-sma50" style="font-size: 16px; font-weight: 800; color: var(--accent-blue); margin-top: 2px;">$0.00</div>
+                <div style="font-size: 10px; color: var(--text-muted);">Tendencia</div>
+              </div>
+              <div style="background: var(--bg-surface); padding: 9px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+                <div style="font-size: 10px; color: var(--text-muted);">Soporte / Stop</div>
+                <div id="t-tech-support" style="font-size: 16px; font-weight: 800; color: var(--primary-hover); margin-top: 2px;">$0.00</div>
                 <div style="font-size: 10px; color: var(--text-muted);">Piso Técnico</div>
               </div>
-              <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 10px; color: var(--text-muted);">Resistencia Clave</div>
-                <div id="t-tech-resistance" style="font-size: 18px; font-weight: 800; color: #ef4444; margin-top: 2px;">$0.00</div>
-                <div style="font-size: 10px; color: var(--text-muted);">Techo Técnico</div>
+              <div style="background: var(--bg-surface); padding: 9px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
+                <div style="font-size: 10px; color: var(--text-muted);">Objetivo / Techo</div>
+                <div id="t-tech-resistance" style="font-size: 16px; font-weight: 800; color: var(--danger); margin-top: 2px;">$0.00</div>
+                <div style="font-size: 10px; color: var(--text-muted);">Take Profit</div>
               </div>
             </div>
 
-            <div style="background: rgba(0,0,0,0.3); border-left: 3px solid var(--primary); padding: 12px; border-radius: 6px;">
+            <div style="background: var(--bg-surface); border-left: 3px solid var(--primary); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
               <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Razonamiento Táctico</div>
               <p id="t-tech-reason" style="font-size: 12px; color: var(--text-main); margin: 0; line-height: 1.5;"></p>
             </div>
@@ -1092,8 +1224,8 @@
         </div>
 
         <!-- Noticias Recientes del Ticker -->
-        <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; margin-bottom: 20px;">
-          <div style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+          <div style="font-size: 12px; font-weight: 700; color: var(--accent-blue); text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
             <span>📰 Cobertura Financiera & Sentimiento Reciente</span>
           </div>
           <div id="t-news-container" style="display: flex; flex-direction: column; gap: 10px;">
@@ -1114,6 +1246,6 @@
   </div>
 
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=2.9.0"></script>
+  <script src="/js/app.js?v=3.0.0"></script>
 </body>
 </html>

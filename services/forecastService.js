@@ -1,103 +1,181 @@
 /**
- * Servicio de Pronóstico Bursátil e Inteligencia de Algoritmo de Trading
- * Evalúa las posiciones abiertas para determinar la recomendación (Vender, Mantener, Acumular)
- * y el horizonte de tiempo estimado (Días, Semanas, Meses) para maximizar la rentabilidad.
+ * Servicio Cuantitativo de Pronóstico Bursátil e Inteligencia de Decisión (Estilo Kalshi)
+ * Combina:
+ *  1) Estado real de la posición abierta (Precio compra, P&L %, Días en cartera, Stop manual)
+ *  2) Indicadores Técnicos Multifactoriales en Vivo (RSI 14, MACD 12/26/9, SMA 20/50/200, ATR 14, RVOL, Soportes)
+ *  3) Historial personal del inversor en ese mismo ticker (Win Rate histórico y retorno promedio)
  */
 
-function analyzePositionForecast(pos) {
+function analyzePositionForecast(pos, ta = null, tickerHistory = null) {
   const symbol = pos.symbol;
-  const buyPrice = pos.buy_price;
-  const livePrice = pos.livePrice || buyPrice;
-  const returnPercent = pos.unrealizedGainPercent || 0;
-  const daysHeld = pos.daysHeld || 0;
-  const stopLoss = pos.stop_loss;
+  const buyPrice = Number(pos.buy_price) || 1;
+  const livePrice = Number(pos.livePrice || (ta && ta.currentPrice) || buyPrice);
+  const shares = Number(pos.shares) || 0;
+  const invested = Number(pos.invested) || Number((shares * buyPrice).toFixed(2));
+  const returnPercent = pos.unrealizedGainPercent !== undefined
+    ? Number(pos.unrealizedGainPercent)
+    : ((livePrice - buyPrice) / buyPrice) * 100;
+  const daysHeld = Number(pos.daysHeld) || 0;
+  const manualStopLoss = pos.stop_loss ? Number(pos.stop_loss) : null;
+
+  // Extraer métricas técnicas reales o usar estimaciones conservadoras
+  const atr = (ta && ta.atr) ? Number(ta.atr) : Number((livePrice * 0.025).toFixed(2));
+  const atrPercent = (ta && ta.atrPercent) ? Number(ta.atrPercent) : 2.5;
+  const rsi = (ta && ta.rsi) ? Number(ta.rsi) : 52.0;
+  const sma20 = (ta && ta.sma20) ? Number(ta.sma20) : Number((livePrice * 0.99).toFixed(2));
+  const sma50 = (ta && ta.sma50) ? Number(ta.sma50) : Number((livePrice * 0.97).toFixed(2));
+  const sma200 = (ta && ta.sma200) ? Number(ta.sma200) : Number((livePrice * 0.92).toFixed(2));
+  const support = (ta && ta.support) ? Number(ta.support) : Number((livePrice - 2.0 * atr).toFixed(2));
+  const resistance = (ta && ta.resistance) ? Number(ta.resistance) : Number((livePrice + 2.8 * atr).toFixed(2));
+  const volumeRatio = (ta && ta.volumeRatio) ? Number(ta.volumeRatio) : 1.0;
+  const macdState = (ta && ta.macd && ta.macd.state) ? ta.macd.state : 'NEUTRAL';
+  const expectedLow5d = (ta && ta.expectedLow5d) ? Number(ta.expectedLow5d) : Number(Math.max(0.01, livePrice - atr * 2.236).toFixed(2));
+  const expectedHigh5d = (ta && ta.expectedHigh5d) ? Number(ta.expectedHigh5d) : Number((livePrice + atr * 2.236).toFixed(2));
+
+  // Score base técnico Kalshi (0 - 100%)
+  let kalshiProb = (ta && ta.kalshiProb) ? Number(ta.kalshiProb) : 58;
+
+  // Ajustar probabilidad con el historial personal del usuario en este ticker
+  const personalWinRate = (tickerHistory && tickerHistory.tradesCount > 0) ? Number(tickerHistory.winRate) : null;
+  const personalTrades = (tickerHistory && tickerHistory.tradesCount) ? Number(tickerHistory.tradesCount) : 0;
+  if (personalWinRate !== null) {
+    if (personalWinRate >= 75) kalshiProb = Math.min(94, Math.round(kalshiProb + 5));
+    else if (personalWinRate < 40) kalshiProb = Math.max(15, Math.round(kalshiProb - 5));
+  }
+
+  // Cálculo de Stop Loss Dinámico por Volatilidad (ATR) o Trailing Stop si ya está en ganancia
+  let isTrailingStop = false;
+  let suggestedStopLoss = manualStopLoss || Number(Math.max(0.01, Math.min(support * 0.995, livePrice - 1.8 * atr)).toFixed(2));
+
+  if (returnPercent >= 4.5) {
+    // Activar Trailing Stop Dinámico para asegurar ganancias (nunca por debajo de break-even + 1%)
+    const trailingCandidate = Number(Math.max(buyPrice * 1.012, livePrice - 1.65 * atr).toFixed(2));
+    if (trailingCandidate > suggestedStopLoss && trailingCandidate < livePrice) {
+      suggestedStopLoss = trailingCandidate;
+      isTrailingStop = true;
+    }
+  }
+
+  // Cálculo de Precio Objetivo Dinámico basado en Resistencia + Expansión ATR
+  let rawTarget = Math.max(resistance, livePrice + 2.6 * atr, buyPrice * 1.08);
+  let targetPrice = Number(rawTarget.toFixed(2));
 
   // Variables de decisión
-  let action = 'MANTENER'; // 'VENDER', 'MANTENER', 'ACUMULAR'
-  let actionColor = 'success'; // 'danger', 'success', 'warning'
-  let horizon = 'Semanas'; // 'Días', 'Semanas', 'Meses'
-  let targetPrice = Number((livePrice * 1.12).toFixed(2));
-  let targetReturn = 12.0;
+  let action = 'MANTENER';
+  let actionColor = 'success';
+  let horizon = '2 a 3 Semanas';
+  let confidence = kalshiProb >= 68 ? 'Alta' : kalshiProb >= 48 ? 'Media' : 'Moderada';
   let reason = '';
-  let confidence = 'Alta';
 
-  // Reglas algorítmicas de trading basadas en comportamiento histórico del portafolio (Win rate de Mauricio 90.5%)
+  // Señales técnicas resumidas
+  const signals = (ta && Array.isArray(ta.signals) && ta.signals.length > 0)
+    ? [...ta.signals]
+    : [`RSI ${rsi}`, `ATR $${atr}`, `RVOL ${volumeRatio}x`];
 
-  // 1. Caso Stop Loss alcanzado o Pérdida Significativa (> -8%)
-  if ((stopLoss && livePrice <= stopLoss) || returnPercent < -8.0) {
-    action = 'VENDER';
-    actionColor = 'danger';
-    horizon = 'Inmediato (Hoy)';
-    targetPrice = livePrice;
-    targetReturn = returnPercent;
-    reason = `La posición ha alcanzado el nivel crítico de riesgo (${returnPercent.toFixed(1)}%). Se recomienda cortar la pérdida para proteger el capital e invertirlo en activos con mejor momentum.`;
-    confidence = 'Alta';
+  if (isTrailingStop) {
+    signals.unshift(`Trailing Stop $${suggestedStopLoss}`);
   }
-  // 2. Caso Tomar Ganancias (Ganancia > +15% o periodo corto muy rentable)
-  else if (returnPercent >= 15.0 || (returnPercent >= 8.0 && daysHeld <= 5)) {
-    action = 'VENDER';
+  if (personalTrades > 0 && personalWinRate !== null) {
+    signals.push(`Tu WinRate ${symbol}: ${personalWinRate.toFixed(0)}% (${personalTrades} ops)`);
+  }
+
+  // --- REGLAS CUANTITATIVAS MULTIFACTORIALES ---
+
+  // 1. Stop Loss vulnerado o ruptura bajista severa con baja probabilidad de rebote
+  if ((manualStopLoss && livePrice <= manualStopLoss) || (returnPercent < -8.5 && kalshiProb < 42 && rsi >= 33)) {
+    action = 'CORTAR PÉRDIDA / VENDER';
+    actionColor = 'danger';
+    horizon = 'Inmediato (1-2 Sesiones)';
+    targetPrice = Number(Math.max(livePrice, sma20).toFixed(2));
+    confidence = 'Alta';
+    reason = `Ruptura de nivel de protección (${returnPercent.toFixed(1)}%) con débil probabilidad alcista (${kalshiProb}%) y MACD en estado ${macdState}. Se sugiere preservar capital o rotar hacia activos con mayor fuerza relativa.`;
+  }
+  // 2. Toma de Ganancias por Sobrecompra Técnica (RSI > 70 o Ganancia fuerte cerca de Resistencia)
+  else if ((returnPercent >= 14.0 && rsi >= 67) || (returnPercent >= 8.0 && rsi >= 72)) {
+    action = 'TOMAR GANANCIA / TRAILING';
     actionColor = 'success';
     horizon = '1 a 3 Días';
-    targetPrice = Number((livePrice * 1.03).toFixed(2));
-    targetReturn = returnPercent + 3.0;
-    reason = `Excelente rendimiento acumulado (+${returnPercent.toFixed(1)}%). El activo muestra zona de toma de beneficios. Se recomienda asegurar las ganancias en los próximos 1-3 días.`;
+    targetPrice = Number(Math.max(livePrice * 1.025, resistance).toFixed(2));
     confidence = 'Alta';
+    reason = `Excelente plusvalía (+${returnPercent.toFixed(1)}%) entrando en zona de sobrecompra técnica (RSI ${rsi}) cerca de la resistencia de $${resistance}. Se recomienda asegurar beneficios parciales o ajustar el Trailing Stop a $${suggestedStopLoss}.`;
   }
-  // 3. Caso Ligera Pérdida o Consolidación (-0% a -8%): Oportunidad de esperar recuperación o acumular
+  // 3. Posición Ganadora con Tendencia Alcista Fuerte -> Subir Trailing Stop y Dejar Correr
+  else if (returnPercent >= 4.5 && kalshiProb >= 55) {
+    action = 'MANTENER / SUBIR STOP';
+    actionColor = 'success';
+    horizon = daysHeld <= 15 ? '1 a 2 Semanas' : '2 a 4 Semanas';
+    targetPrice = Number(Math.max(resistance, livePrice + 2.8 * atr, buyPrice * 1.14).toFixed(2));
+    confidence = 'Alta';
+    reason = `Impulso ganador (+${returnPercent.toFixed(1)}%) respaldado por ${kalshiProb}% de probabilidad alcista Kalshi (MACD: ${macdState}, RVOL: ${volumeRatio}x). Sube tu Trailing Stop a $${suggestedStopLoss} para blindar ganancias mientras buscas $${targetPrice}.`;
+  }
+  // 4. Posición en retroceso pero en Soporte o Sobreventa (Oportunidad de Promediar / DCA inteligente)
+  else if (returnPercent < 0 && (rsi < 38 || livePrice <= support * 1.03 || kalshiProb >= 56)) {
+    action = 'ACUMULAR EN SOPORTE (DCA)';
+    actionColor = 'warning';
+    horizon = '2 a 4 Semanas';
+    targetPrice = Number(Math.max(buyPrice * 1.06, sma50, livePrice + 2.5 * atr).toFixed(2));
+    confidence = kalshiProb >= 60 ? 'Alta' : 'Media';
+    reason = `El retroceso actual (${returnPercent.toFixed(1)}%) sitúa al activo cerca del soporte clave de $${support} (RSI ${rsi}, ATR $${atr}). La estructura ofrece una ventana favorable para promediar a la baja (DCA) buscando recuperación hacia $${targetPrice}.`;
+  }
+  // 5. Posición en consolidación o retroceso moderado sin señal de compra aún
   else if (returnPercent < 0) {
-    if (daysHeld > 45) {
-      action = 'MANTENER';
-      actionColor = 'warning';
-      horizon = '1 a 2 Meses';
-      targetPrice = Number((buyPrice * 1.05).toFixed(2));
-      targetReturn = 5.0;
-      reason = `Posición en consolidación prolongada (${daysHeld} días). La estructura técnica sugiere esperar recuperación hacia el precio de entrada ($${buyPrice.toFixed(2)}) en un horizonte de 1 a 2 meses.`;
-    } else {
-      action = 'ACUMULAR / MEJORAR';
-      actionColor = 'warning';
-      horizon = '2 a 4 Semanas';
-      targetPrice = Number((buyPrice * 1.08).toFixed(2));
-      targetReturn = 8.0;
-      reason = `La corrección actual (-${Math.abs(returnPercent).toFixed(1)}%) ofrece una oportunidad para mejorar el precio promedio de compra. Se recomienda esperar de 2 a 4 semanas para alcanzar rentabilidad positiva.`;
-    }
+    action = 'MANTENER / VIGILAR STOP';
+    actionColor = 'warning';
+    horizon = daysHeld > 35 ? '3 a 6 Semanas' : '2 a 4 Semanas';
+    targetPrice = Number(Math.max(buyPrice * 1.04, sma20, livePrice + 2.0 * atr).toFixed(2));
+    reason = `Activo en fase de consolidación (${returnPercent.toFixed(1)}%) con volatilidad diaria ATR de $${atr} (${atrPercent}%). Mantener vigilancia sobre el soporte de $${support} y stop sugerido en $${suggestedStopLoss} esperando cruce alcista en MACD.`;
   }
-  // 4. Caso Ganancia Moderada (0% a +15%): Mantener impulso
+  // 6. Ganancia moderada (0% a +4.5%)
   else {
-    if (daysHeld <= 14) {
-      action = 'MANTENER';
-      actionColor = 'success';
-      horizon = '3 a 7 Días';
-      targetPrice = Number((buyPrice * 1.12).toFixed(2));
-      targetReturn = 12.0;
-      reason = `Fuerte impulso inicial (+${returnPercent.toFixed(1)}%). La tendencia de corto plazo favorece mantener la posición durante los próximos días para buscar el objetivo de $${targetPrice.toFixed(2)}.`;
-    } else if (daysHeld <= 45) {
-      action = 'MANTENER';
-      actionColor = 'success';
-      horizon = '2 a 3 Semanas';
-      targetPrice = Number((buyPrice * 1.15).toFixed(2));
-      targetReturn = 15.0;
-      reason = `Tendencia ascendente estable (+${returnPercent.toFixed(1)}%). Se sugiere mantener la posición en un horizonte de 2 a 3 semanas para maximizar la rentabilidad del portafolio.`;
-    } else {
-      action = 'MANTENER';
-      actionColor = 'success';
-      horizon = '1 a 3 Meses';
-      targetPrice = Number((buyPrice * 1.18).toFixed(2));
-      targetReturn = 18.0;
-      reason = `Posición madura en terreno positivo (+${returnPercent.toFixed(1)}%). Para alcanzar la rentabilidad objetivo del 18% se recomienda mantener durante 1 a 3 meses.`;
-    }
+    action = 'MANTENER IMPULSO';
+    actionColor = 'success';
+    horizon = '1 a 3 Semanas';
+    targetPrice = Number(Math.max(resistance, buyPrice * 1.12, livePrice + 2.5 * atr).toFixed(2));
+    reason = `Posición en terreno positivo (+${returnPercent.toFixed(1)}%) con probabilidad alcista del ${kalshiProb}% y rango esperado a 5 días entre $${expectedLow5d} y $${expectedHigh5d}. Mantener rumbo al objetivo técnico de $${targetPrice}.`;
   }
+
+  // Cálculos de retorno proyectado y relación Riesgo / Beneficio desde el precio actual
+  const targetReturn = Number((((targetPrice - buyPrice) / buyPrice) * 100).toFixed(1));
+  const upsideFromCurrent = Math.max(0.01, targetPrice - livePrice);
+  const downsideToStop = Math.max(0.01, livePrice - suggestedStopLoss);
+  const upsidePercent = Number(((upsideFromCurrent / livePrice) * 100).toFixed(1));
+  const downsidePercent = Number(((downsideToStop / livePrice) * 100).toFixed(1));
+  const riskRewardRatio = Number((upsideFromCurrent / downsideToStop).toFixed(2));
 
   return {
     symbol,
     action,
     actionColor,
     horizon,
-    currentPrice: livePrice,
-    buyPrice,
+    currentPrice: Number(livePrice.toFixed(2)),
+    buyPrice: Number(buyPrice.toFixed(2)),
+    shares,
+    invested,
     returnPercent: Number(returnPercent.toFixed(2)),
     daysHeld,
     targetPrice,
-    targetReturn: Number(targetReturn.toFixed(1)),
+    targetReturn,
+    upsidePercent,
+    downsidePercent,
+    suggestedStopLoss,
+    isTrailingStop,
+    riskRewardRatio,
+    kalshiProb,
+    atr,
+    atrPercent,
+    expectedLow5d,
+    expectedHigh5d,
+    support,
+    resistance,
+    rsi,
+    macdState,
+    sma20,
+    sma50,
+    sma200,
+    volumeRatio,
+    personalWinRate,
+    personalTrades,
+    signals: signals.slice(0, 5),
     reason,
     confidence
   };
