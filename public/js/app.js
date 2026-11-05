@@ -3,7 +3,9 @@ const app = {
   currentUser: null,
   charts: {},
   refreshInterval: null,
-  selectedIntradaySymbol: 'TSLA',
+  selectedIntradaySymbol: 'LLY',
+  hasInitializedChartSymbol: false,
+  intradayReqId: 0,
 
   async init() {
     this.initTheme();
@@ -166,7 +168,7 @@ const app = {
       this.renderSummary(data.summary);
       this.renderOpenPositionsCards(data.openPositions);
       this.renderVerticalTickerList(data.openPositions);
-      this.renderCharts(data.openPositions);
+      this.renderCharts(data.openPositions, isSilent);
       this.renderNews(data.news);
       this.renderOpenTable(data.openPositions);
       this.renderClosedTable(data.closedPositions);
@@ -482,15 +484,18 @@ const app = {
             <span>Total: <strong>$${(pos.currentValue || 0).toFixed(2)}</strong></span>
           </div>
 
-          <div class="holding-card-actions" style="grid-template-columns: 1fr 1fr auto;" onclick="event.stopPropagation()">
+          <div class="holding-card-actions" style="grid-template-columns: 1fr 1fr auto auto;" onclick="event.stopPropagation()">
             <button type="button" class="btn-card-action btn-card-buy" onclick="app.quickBuyCurrentTicker('${pos.symbol}', ${pos.livePrice || pos.buy_price})">
               ➕ Comprar+
             </button>
             <button type="button" class="btn-card-action btn-card-sell" onclick="app.quickSellCurrentTicker('${pos.symbol}', ${pos.quantity}, ${pos.livePrice || pos.buy_price})">
               💵 Vender
             </button>
-            <button type="button" class="btn-card-action" style="background: var(--bg-surface-elevated); color: var(--text-main); border: 1px solid var(--border-color); padding: 7px 10px;" onclick="app.openForecastModal(${pos.id})" title="Ver Instrucción Racional y Simulador DCA">
-              📲 Racional / DCA
+            <button type="button" class="btn-card-action" style="background: var(--bg-surface-elevated); color: var(--text-main); border: 1px solid var(--border-color); padding: 7px 9px;" onclick="app.openForecastModal(${pos.id})" title="Ver Instrucción Racional y Simulador DCA">
+              📲 Racional
+            </button>
+            <button type="button" class="btn-card-action" style="background: var(--bg-surface-elevated); color: var(--accent-blue); border: 1px solid var(--border-color); padding: 7px 9px;" onclick="app.selectTickerOnChart('${pos.symbol}')" title="Ver ${pos.symbol} en el Gráfico Kalshi">
+              📈
             </button>
           </div>
         </div>
@@ -803,19 +808,52 @@ const app = {
     }
   },
 
-  renderCharts(openPositions) {
+  renderCharts(openPositions, isSilent = false) {
     const selectElem = document.getElementById('chart-stock-select');
-    if (selectElem && openPositions && openPositions.length > 0) {
-      const currentSelected = this.selectedIntradaySymbol;
-      let html = '';
-      openPositions.forEach(p => {
-        const isSel = p.symbol === currentSelected ? 'selected' : '';
-        html += `<option value="${p.symbol}" ${isSel}>${p.symbol} ($${p.livePrice.toFixed(2)})</option>`;
-      });
-      selectElem.innerHTML = html;
+    const pillsContainer = document.getElementById('kalshi-chart-ticker-pills');
 
-      if (!openPositions.some(p => p.symbol === currentSelected)) {
-        this.selectedIntradaySymbol = openPositions[0].symbol;
+    // Construir lista única de símbolos abiertos
+    const seen = new Set();
+    const uniqueOpen = [];
+    (openPositions || []).forEach(p => {
+      const sym = (p.symbol || '').trim().toUpperCase();
+      if (sym && !seen.has(sym)) {
+        seen.add(sym);
+        uniqueOpen.push({ symbol: sym, livePrice: Number(p.livePrice || p.buy_price || 0) });
+      }
+    });
+
+    if (uniqueOpen.length > 0) {
+      if (!this.hasInitializedChartSymbol || !this.selectedIntradaySymbol) {
+        this.selectedIntradaySymbol = uniqueOpen[0].symbol;
+        this.hasInitializedChartSymbol = true;
+      }
+
+      const currentSelected = (this.selectedIntradaySymbol || uniqueOpen[0].symbol).trim().toUpperCase();
+      // Si el usuario seleccionó un símbolo desde el Analizador o Radar que no está en abiertas, incluirlo también
+      const listForSelector = [...uniqueOpen];
+      if (!listForSelector.some(item => item.symbol === currentSelected)) {
+        listForSelector.unshift({ symbol: currentSelected, livePrice: 0 });
+      }
+
+      // Actualizar <select> solo si el usuario no lo tiene desplegado en este instante
+      if (selectElem && document.activeElement !== selectElem) {
+        let html = '';
+        listForSelector.forEach(item => {
+          const isSel = item.symbol === currentSelected ? 'selected' : '';
+          const priceTxt = item.livePrice > 0 ? ` (${item.livePrice.toFixed(2)})` : '';
+          html += `<option value="${item.symbol}" ${isSel}>${item.symbol}${priceTxt}</option>`;
+        });
+        selectElem.innerHTML = html;
+        selectElem.value = currentSelected;
+      }
+
+      // Renderizar píldoras 1-clic de acciones encima del gráfico
+      if (pillsContainer) {
+        pillsContainer.innerHTML = listForSelector.map(item => {
+          const isAct = item.symbol === currentSelected ? 'active' : '';
+          return `<button type="button" class="kalshi-ticker-pill ${isAct}" data-symbol="${item.symbol}" onclick="app.changeIntradaySymbol('${item.symbol}')">${item.symbol}</button>`;
+        }).join('');
       }
     }
 
@@ -824,9 +862,43 @@ const app = {
     this.fetchAndRenderHistoricalChart();
   },
 
+  selectTickerOnChart(symbol) {
+    const cleanSym = (symbol || '').trim().toUpperCase();
+    if (!cleanSym) return;
+    this.changeIntradaySymbol(cleanSym);
+    const chartCard = document.getElementById('chart-intraday-line');
+    if (chartCard) {
+      chartCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  },
+
   async changeIntradaySymbol(symbol) {
-    this.selectedIntradaySymbol = symbol;
-    await this.fetchAndRenderIntradayChart(symbol);
+    const cleanSym = (symbol || '').trim().toUpperCase();
+    if (!cleanSym) return;
+    this.selectedIntradaySymbol = cleanSym;
+    this.hasInitializedChartSymbol = true;
+
+    // Sincronizar selector desplegable y barra de píldoras inmediatamente
+    const selectElem = document.getElementById('chart-stock-select');
+    if (selectElem && selectElem.value !== cleanSym) {
+      selectElem.value = cleanSym;
+    }
+    const pillsContainer = document.getElementById('kalshi-chart-ticker-pills');
+    if (pillsContainer) {
+      pillsContainer.querySelectorAll('.kalshi-ticker-pill').forEach(btn => {
+        if (btn.getAttribute('data-symbol') === cleanSym || btn.innerText.trim() === cleanSym) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    }
+    const titleEl = document.getElementById('kalshi-intraday-ticker-title');
+    if (titleEl) {
+      titleEl.innerText = `${cleanSym} • CARGANDO GRÁFICO...`;
+    }
+
+    await this.fetchAndRenderIntradayChart(cleanSym);
   },
 
   async fetchAndRenderIntradayChart(symbol) {
@@ -834,12 +906,17 @@ const app = {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
+    const cleanSym = (symbol || this.selectedIntradaySymbol || 'TSLA').trim().toUpperCase();
+    const reqId = ++this.intradayReqId;
     const config = this.timeframeConfigs[this.currentTimeframe] || this.timeframeConfigs['15m'];
 
     try {
-      const res = await fetch(`/api/chart/intraday?symbol=${encodeURIComponent(symbol)}&interval=${config.interval}&range=${config.range}&_t=${Date.now()}`);
+      const res = await fetch(`/api/chart/intraday?symbol=${encodeURIComponent(cleanSym)}&interval=${config.interval}&range=${config.range}&_t=${Date.now()}`);
       if (!res.ok) throw new Error('Error al obtener datos intradiarios');
       const data = await res.json();
+      // Si el usuario cambió a otra acción mientras esta petición estaba en curso, descartar respuesta antigua
+      if (reqId !== this.intradayReqId) return;
+      symbol = cleanSym;
 
       const points = data.points || [];
       const labels = points.map(p => p.time);

@@ -1174,6 +1174,43 @@ body.dark-theme .btn-card-buy:hover {
   font-size: 13px;
 }
 
+.kalshi-ticker-pills-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.kalshi-ticker-pill {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-family: var(--font-condensed);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.kalshi-ticker-pill:hover {
+  border-color: var(--primary);
+  color: var(--text-main);
+  transform: translateY(-1px);
+}
+
+.kalshi-ticker-pill.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(10, 194, 133, 0.28);
+}
+
 .kalshi-style-pill-group {
   display: flex;
   background: var(--bg-dark);

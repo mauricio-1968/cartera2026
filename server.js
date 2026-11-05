@@ -161,9 +161,10 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
 
     const openSymbols = openRows.map(r => r.symbol);
     const uniqueOpenSymbols = [...new Set(openSymbols.map(s => (s || '').trim().toUpperCase()).filter(Boolean))];
-    const [livePrices, taList] = await Promise.all([
+    const [livePrices, taList, news] = await Promise.all([
       getStockPrices(openSymbols),
-      Promise.all(uniqueOpenSymbols.map(sym => getTechnicalAnalysis(sym).catch(() => null)))
+      Promise.all(uniqueOpenSymbols.map(sym => getTechnicalAnalysis(sym).catch(() => null))),
+      getPortfolioNews(openSymbols).catch(() => [])
     ]);
 
     const taMap = {};
@@ -330,9 +331,6 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
       healthStatus = 'DEFENSIVA';
       healthColor = 'danger';
     }
-
-    const news = await getPortfolioNews(openSymbols);
-
     res.json({
       summary: {
         totalPortfolioValue: Number(currentPortfolioValue.toFixed(2)),

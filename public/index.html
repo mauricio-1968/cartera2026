@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   
   <!-- CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=3.2.1">
+  <link rel="stylesheet" href="/css/styles.css?v=3.2.2">
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -247,7 +247,19 @@
               <div class="kalshi-select-wrapper">
                 <label class="kalshi-select-label">ACCIÓN</label>
                 <select id="chart-stock-select" class="kalshi-ticker-select" onchange="app.changeIntradaySymbol(this.value)">
-                  <!-- Opciones dinámicas -->
+                  <option value="LLY">LLY</option>
+                  <option value="TTWO">TTWO</option>
+                  <option value="META">META</option>
+                  <option value="MELI">MELI</option>
+                  <option value="MNST">MNST</option>
+                  <option value="DAIC">DAIC</option>
+                  <option value="GOOGL">GOOGL</option>
+                  <option value="APPS">APPS</option>
+                  <option value="CFG">CFG</option>
+                  <option value="TSLA" selected>TSLA</option>
+                  <option value="SPCX">SPCX</option>
+                  <option value="LNAI">LNAI</option>
+                  <option value="IREN">IREN</option>
                 </select>
               </div>
 
@@ -270,6 +282,23 @@
                 </button>
               </div>
             </div>
+          </div>
+
+          <!-- Barra Interactiva 1-Clic de Acciones de tu Cartera -->
+          <div id="kalshi-chart-ticker-pills" class="kalshi-ticker-pills-bar">
+            <button type="button" class="kalshi-ticker-pill" onclick="app.changeIntradaySymbol('LLY')">LLY</button>
+            <button type="button" class="kalshi-ticker-pill" onclick="app.changeIntradaySymbol('TTWO')">TTWO</button>
+            <button type="button" class="kalshi-ticker-pill" onclick="app.changeIntradaySymbol('META')">META</button>
+            <button type="button" class="kalshi-ticker-pill" onclick="app.changeIntradaySymbol('MELI')">MELI</button>
+            <button type="button" class="kalshi-ticker-pill" onclick="app.changeIntradaySymbol('MNST')">MNST</button>
+            <button type="button" class="kalshi-ticker-pill" onclick="app.changeIntradaySymbol('DAIC')">DAIC</button>
+            <button type="button" class="kalshi-ticker-pill" onclick="app.changeIntradaySymbol('GOOGL')">GOOGL</button>
+            <button type="button" class="kalshi-ticker-pill" onclick="app.changeIntradaySymbol('APPS')">APPS</button>
+            <button type="button" class="kalshi-ticker-pill" onclick="app.changeIntradaySymbol('CFG')">CFG</button>
+            <button type="button" class="kalshi-ticker-pill active" onclick="app.changeIntradaySymbol('TSLA')">TSLA</button>
+            <button type="button" class="kalshi-ticker-pill" onclick="app.changeIntradaySymbol('SPCX')">SPCX</button>
+            <button type="button" class="kalshi-ticker-pill" onclick="app.changeIntradaySymbol('LNAI')">LNAI</button>
+            <button type="button" class="kalshi-ticker-pill" onclick="app.changeIntradaySymbol('IREN')">IREN</button>
           </div>
 
           <!-- Lienzo del Gráfico Kalshi -->
@@ -1277,6 +1306,6 @@
   </div>
 
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=3.2.1"></script>
+  <script src="/js/app.js?v=3.2.2"></script>
 </body>
 </html>
