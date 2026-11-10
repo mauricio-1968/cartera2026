@@ -1652,3 +1652,356 @@ body.dark-theme .btn-card-buy:hover {
     font-size: 38px;
   }
 }
+
+/* ==========================================================
+   INDICADORES EXPLICATIVOS (ⓘ BADGES, TOOLTIP & GUÍA MODAL)
+   ========================================================== */
+.info-help-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 2px 7px;
+  margin-left: 4px;
+  font-size: 10.5px;
+  font-weight: 800;
+  font-family: var(--font-sans);
+  color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.32);
+  border-radius: 999px;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: all 0.18s ease;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.info-help-badge:hover {
+  background: var(--accent-blue);
+  color: #ffffff;
+  border-color: var(--accent-blue);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(59, 130, 246, 0.35);
+}
+
+.indicator-floating-tooltip {
+  position: fixed;
+  z-index: 99999;
+  width: 350px;
+  max-width: calc(100vw - 24px);
+  background: var(--bg-card);
+  border: 1.5px solid var(--accent-blue);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.ift-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+#ift-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.ift-tag {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--primary-hover);
+}
+
+.ift-summary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.48;
+  margin-bottom: 10px;
+}
+
+.ift-formula-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent-blue);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
+.ift-formula-label {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 0.4px;
+  margin-bottom: 3px;
+}
+
+.ift-formula-code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent-blue);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.ift-source {
+  font-size: 11px;
+  color: var(--text-main);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.ift-footer-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: right;
+}
+
+.indicator-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+}
+
+.indicator-guide-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.indicator-guide-card:hover {
+  border-color: var(--accent-blue);
+  transform: translateY(-2px);
+}
+
+.indicator-guide-card.active-guide-card {
+  border: 2px solid var(--primary);
+  background: var(--primary-light);
+}
+
+/* ==========================================================
+   REDISEÑO VISUAL DE POSICIONES ABIERTAS (TARJETAS Y TABLA)
+   Mayor separación, bloques comparativos y termómetro de rango
+   ========================================================== */
+.holdings-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(345px, 1fr));
+  gap: 24px;
+  padding: 6px 2px;
+}
+
+.holding-card {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-color);
+  border-radius: 18px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.holding-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.16);
+}
+
+.holding-card.card-status-profit {
+  border-top: 5px solid var(--primary);
+}
+
+.holding-card.card-status-loss {
+  border-top: 5px solid var(--danger);
+}
+
+.holding-index-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--bg-surface-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+}
+
+/* Bloque comparativo de 2 columnas: Tu Inversión vs Resultado Hoy */
+.holding-metrics-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.holding-metric-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.holding-metric-col:last-child {
+  border-left: 1px solid var(--border-color);
+  padding-left: 12px;
+}
+
+.holding-metric-col-label {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+}
+
+.holding-metric-col-main {
+  font-size: 16px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--text-main);
+}
+
+.holding-metric-col-sub {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Termómetro Visual de Rango de Precio (Stop ── Compra ── Hoy ── Meta) */
+.holding-range-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.holding-range-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.holding-range-track {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.35) 0%, rgba(59, 130, 246, 0.35) 45%, rgba(16, 185, 129, 0.5) 100%);
+  margin: 4px 0;
+}
+
+.holding-range-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #3b82f6, #10b981);
+}
+
+.holding-range-marker-buy {
+  position: absolute;
+  top: -3px;
+  width: 3px;
+  height: 14px;
+  background: var(--text-muted);
+  border-radius: 2px;
+  transform: translateX(-50%);
+}
+
+.holding-range-marker-now {
+  position: absolute;
+  top: -4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-main);
+  border: 3px solid var(--primary);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+  transform: translateX(-50%);
+}
+
+.holding-range-foot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* Separación clara de filas en la Tabla de Posiciones Abiertas (#tab-open) */
+.open-positions-table {
+  border-collapse: separate !important;
+  border-spacing: 0 12px !important;
+  padding: 0 8px;
+}
+
+.open-positions-table thead th {
+  border-bottom: none;
+  padding: 10px 14px;
+  background: transparent;
+}
+
+.open-positions-table tbody tr {
+  background: var(--bg-surface);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.open-positions-table tbody tr:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.open-positions-table tbody td {
+  padding: 14px 14px !important;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.open-positions-table tbody td:first-child {
+  border-left: 4px solid var(--primary);
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
+}
+
+.open-positions-table tbody tr.row-loss td:first-child {
+  border-left-color: var(--danger);
+}
+
+.open-positions-table tbody td:last-child {
+  border-right: 1px solid var(--border-color);
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
+}

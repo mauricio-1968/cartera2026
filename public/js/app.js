@@ -417,19 +417,31 @@ const app = {
     }
 
     let html = '';
-    filteredPositions.forEach(pos => {
+    filteredPositions.forEach((pos, idx) => {
       const uGain = pos.unrealizedGain || 0;
       const uPct = pos.unrealizedGainPercent || 0;
       const isPositive = uGain >= 0;
       const pillClass = isPositive ? 'pill-up' : 'pill-down';
+      const statusCardClass = isPositive ? 'card-status-profit' : 'card-status-loss';
       const dayChangeClass = (pos.change || 0) >= 0 ? 'text-success' : 'text-danger';
       const dayChangeSign = (pos.change || 0) >= 0 ? '+' : '';
       const fc = pos.forecast || {};
       const kProb = fc.kalshiProb || 60;
-      const rrRatio = fc.riskRewardRatio || 1.8;
-      const stopLbl = fc.isTrailingStop ? 'Trailing' : 'Stop';
-      const stopVal = fc.suggestedStopLoss ? `$${fc.suggestedStopLoss.toFixed(2)}` : '-';
-      const targetVal = fc.targetPrice ? `$${fc.targetPrice.toFixed(2)}` : '-';
+      const stopLbl = fc.isTrailingStop ? 'Trailing Stop' : 'Stop Loss';
+      const stopNum = fc.suggestedStopLoss || (pos.buy_price * 0.92);
+      const targetNum = fc.targetPrice || (pos.buy_price * 1.15);
+      const liveNum = pos.livePrice || pos.buy_price;
+      const buyNum = parseFloat(pos.buy_price) || liveNum;
+
+      const stopVal = stopNum ? `${stopNum.toFixed(2)}` : '-';
+      const targetVal = targetNum ? `${targetNum.toFixed(2)}` : '-';
+
+      // Cálculo de posición porcentual en la barra termómetro (Stop ── Compra ── Hoy ── Meta)
+      const minRange = Math.min(stopNum, buyNum, liveNum) * 0.98;
+      const maxRange = Math.max(targetNum, buyNum, liveNum) * 1.02;
+      const spanRange = Math.max(0.01, maxRange - minRange);
+      const nowPosPct = Math.min(96, Math.max(4, ((liveNum - minRange) / spanRange) * 100));
+      const buyPosPct = Math.min(96, Math.max(4, ((buyNum - minRange) / spanRange) * 100));
 
       const rAction = fc.racionalAction || 'MANTENER POSICIÓN';
       const rSub = fc.racionalSubtext || 'Mantener en Racional';
@@ -444,57 +456,91 @@ const app = {
       }
 
       html += `
-        <div class="holding-card" onclick="app.openTickerAnalysisModal('${pos.symbol}')">
+        <div class="holding-card ${statusCardClass}" onclick="app.openTickerAnalysisModal('${pos.symbol}')">
+          <!-- 1. CABECERA CLARA: ÍNDICE DE POSICIÓN + TICKER + PRECIO HOY -->
           <div class="holding-card-top">
             <div class="holding-avatar-info">
               <div class="holding-avatar">${pos.symbol.substring(0, 3)}</div>
               <div>
-                <div class="holding-symbol">${pos.symbol}</div>
-                <div class="holding-name">${pos.original_name || pos.symbol}</div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span class="holding-index-badge">Posición #${idx + 1}</span>
+                  <span class="holding-symbol">${pos.symbol}</span>
+                </div>
+                <div class="holding-name">${pos.original_name || pos.symbol} • ${pos.daysHeld || 0} días</div>
               </div>
             </div>
             <div class="holding-price-badge">
-              <div class="holding-live-price">$${(pos.livePrice || pos.buy_price).toFixed(2)}</div>
+              <div class="holding-live-price">${liveNum.toFixed(2)}</div>
               <div class="holding-day-change ${dayChangeClass}">${dayChangeSign}${(pos.changePercent || 0).toFixed(2)}% hoy</div>
             </div>
           </div>
 
-          <div class="holding-profit-box">
-            <div class="holding-profit-label">Ganancia Flotante</div>
-            <div class="holding-profit-pill ${pillClass}">
-              ${isPositive ? '▲ +' : '▼ '}$${Math.abs(uGain).toFixed(2)} (${isPositive ? '+' : ''}${uPct.toFixed(2)}%)
+          <!-- 2. COMPARATIVA VISUAL EN 2 COLUMNAS: TU INVERSIÓN VS RESULTADO HOY -->
+          <div class="holding-metrics-split">
+            <div class="holding-metric-col">
+              <span class="holding-metric-col-label">💼 Tu Inversión <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('open_invested')" onmouseenter="app.showIndicatorTooltip(event, 'open_invested')" onmouseleave="app.hideIndicatorTooltip()">ⓘ</span></span>
+              <span class="holding-metric-col-main">${(pos.buy_total || (pos.quantity * buyNum)).toFixed(2)}</span>
+              <span class="holding-metric-col-sub">${pos.quantity} acc a <strong>${buyNum.toFixed(2)}</strong></span>
+            </div>
+            <div class="holding-metric-col">
+              <span class="holding-metric-col-label">📊 Valor & Ganancia <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('unrealized_gain')" onmouseenter="app.showIndicatorTooltip(event, 'unrealized_gain')" onmouseleave="app.hideIndicatorTooltip()">ⓘ</span></span>
+              <span class="holding-metric-col-main">${(pos.currentValue || 0).toFixed(2)}</span>
+              <div>
+                <span class="holding-profit-pill ${pillClass}" style="font-size: 11.5px; padding: 2px 8px;">
+                  ${isPositive ? '▲ +' : '▼ '}${Math.abs(uGain).toFixed(2)} (${isPositive ? '+' : ''}${uPct.toFixed(2)}%)
+                </span>
+              </div>
             </div>
           </div>
 
-          <!-- BANNER PRINCIPAL DE ACCIÓN CLARA PARA EJECUTAR EN RACIONAL PREMIUM -->
+          <!-- 3. TERMÓMETRO VISUAL DE PRECIO: STOP ── COMPRA ── HOY ── META -->
+          <div class="holding-range-box" onclick="event.stopPropagation(); app.openForecastModal(${pos.id})" title="Haz clic para ver el detalle de Stop Loss y Precio Objetivo">
+            <div class="holding-range-labels">
+              <span style="color: var(--danger);">🛡️ ${stopLbl}: ${stopVal}</span>
+              <span style="color: var(--text-muted); font-size: 10px;">Termómetro de Rango <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('stop_target')" onmouseenter="app.showIndicatorTooltip(event, 'stop_target')" onmouseleave="app.hideIndicatorTooltip()">ⓘ</span></span>
+              <span style="color: var(--primary-hover);">🎯 Meta: ${targetVal}</span>
+            </div>
+            <div class="holding-range-track">
+              <div class="holding-range-fill" style="width: ${nowPosPct}%;"></div>
+              <div class="holding-range-marker-buy" style="left: ${buyPosPct}%;" title="Precio Compra: ${buyNum.toFixed(2)}"></div>
+              <div class="holding-range-marker-now" style="left: ${nowPosPct}%; border-color: ${isPositive ? 'var(--primary)' : 'var(--danger)'};" title="Precio Hoy: ${liveNum.toFixed(2)}"></div>
+            </div>
+            <div class="holding-range-foot">
+              <span>Compra: ${buyNum.toFixed(2)}</span>
+              <span style="font-weight: 800; color: var(--text-main);">● Hoy: ${liveNum.toFixed(2)}</span>
+              <span>Potencial: ${fc.upsidePercent >= 0 ? '+' : ''}${(fc.upsidePercent || 0).toFixed(1)}%</span>
+            </div>
+          </div>
+
+          <!-- 4. BANNER DE ACCIÓN EN RACIONAL PREMIUM -->
           <div class="racional-card-banner ${bannerClass}" onclick="event.stopPropagation(); app.openForecastModal(${pos.id})" title="Haz clic para ver instrucción detallada para Racional y Simulador DCA">
             <div>
-              <div style="font-size: 9.5px; font-weight: 800; color: var(--text-muted); letter-spacing: 0.4px; text-transform: uppercase;">📲 ACCIÓN EN RACIONAL:</div>
+              <div style="font-size: 9.5px; font-weight: 800; color: var(--text-muted); letter-spacing: 0.4px; text-transform: uppercase;">
+                📲 ACCIÓN EN RACIONAL <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('racional_signals')" onmouseenter="app.showIndicatorTooltip(event, 'racional_signals')" onmouseleave="app.hideIndicatorTooltip()">ⓘ</span>
+              </div>
               <div class="racional-action-title">${rIcon} ${rAction}</div>
               <div class="racional-action-sub">${rSub}</div>
             </div>
             <div style="text-align: right; font-family: var(--font-mono);">
-              <div style="font-size: 12px; font-weight: 800; color: ${kProb >= 60 ? 'var(--primary-hover)' : (kProb < 42 ? 'var(--danger)' : 'var(--warning)')};">⚡ ${kProb}% Prob.</div>
-              <div style="font-size: 10px; color: var(--text-muted);">🎯 ${targetVal} • ${stopLbl} ${stopVal}</div>
+              <div style="font-size: 12.5px; font-weight: 800; color: ${kProb >= 60 ? 'var(--primary-hover)' : (kProb < 42 ? 'var(--danger)' : 'var(--warning)')};">
+                ⚡ ${kProb}% Prob. <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('kalshi_prob')" onmouseenter="app.showIndicatorTooltip(event, 'kalshi_prob')" onmouseleave="app.hideIndicatorTooltip()">ⓘ</span>
+              </div>
+              <div style="font-size: 10px; color: var(--text-muted);">Riesgo/Ben. 1:${fc.riskRewardRatio || 2.0}</div>
             </div>
           </div>
 
-          <div class="holding-details-row">
-            <span>Compra: <strong>$${parseFloat(pos.buy_price).toFixed(2)}</strong> (${pos.quantity} acc)</span>
-            <span>Total: <strong>$${(pos.currentValue || 0).toFixed(2)}</strong></span>
-          </div>
-
+          <!-- 5. BOTONES DE OPERACIÓN RÁPIDA -->
           <div class="holding-card-actions" style="grid-template-columns: 1fr 1fr auto auto;" onclick="event.stopPropagation()">
-            <button type="button" class="btn-card-action btn-card-buy" onclick="app.quickBuyCurrentTicker('${pos.symbol}', ${pos.livePrice || pos.buy_price})">
+            <button type="button" class="btn-card-action btn-card-buy" onclick="app.quickBuyCurrentTicker('${pos.symbol}', ${liveNum})">
               ➕ Comprar+
             </button>
-            <button type="button" class="btn-card-action btn-card-sell" onclick="app.quickSellCurrentTicker('${pos.symbol}', ${pos.quantity}, ${pos.livePrice || pos.buy_price})">
+            <button type="button" class="btn-card-action btn-card-sell" onclick="app.quickSellCurrentTicker('${pos.symbol}', ${pos.quantity}, ${liveNum})">
               💵 Vender
             </button>
-            <button type="button" class="btn-card-action" style="background: var(--bg-surface-elevated); color: var(--text-main); border: 1px solid var(--border-color); padding: 7px 9px;" onclick="app.openForecastModal(${pos.id})" title="Ver Instrucción Racional y Simulador DCA">
+            <button type="button" class="btn-card-action" style="background: var(--bg-surface-elevated); color: var(--text-main); border: 1px solid var(--border-color); padding: 7px 10px;" onclick="app.openForecastModal(${pos.id})" title="Ver Instrucción Racional y Simulador DCA">
               📲 Racional
             </button>
-            <button type="button" class="btn-card-action" style="background: var(--bg-surface-elevated); color: var(--accent-blue); border: 1px solid var(--border-color); padding: 7px 9px;" onclick="app.selectTickerOnChart('${pos.symbol}')" title="Ver ${pos.symbol} en el Gráfico Kalshi">
+            <button type="button" class="btn-card-action" style="background: var(--bg-surface-elevated); color: var(--accent-blue); border: 1px solid var(--border-color); padding: 7px 10px;" onclick="app.selectTickerOnChart('${pos.symbol}')" title="Ver ${pos.symbol} en el Gráfico Kalshi">
               📈
             </button>
           </div>
@@ -1480,66 +1526,89 @@ const app = {
   renderOpenTable(openPositions) {
     const tbody = document.getElementById('tbody-open');
     if (!openPositions || openPositions.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-muted); padding: 20px;">No se encontraron posiciones abiertas con el filtro actual.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">No se encontraron posiciones abiertas con el filtro actual.</td></tr>`;
       return;
     }
 
     let html = '';
-    openPositions.forEach(p => {
+    openPositions.forEach((p, idx) => {
       const isGain = p.unrealizedGain >= 0;
+      const fc = p.forecast || {};
+      const stopPrice = fc.suggestedStopLoss || (p.buy_price * 0.92);
+      const targetPrice = fc.targetPrice || (p.buy_price * 1.15);
+      const liveNum = p.livePrice || p.buy_price;
+      const minR = Math.min(stopPrice, p.buy_price, liveNum) * 0.98;
+      const maxR = Math.max(targetPrice, p.buy_price, liveNum) * 1.02;
+      const pctNow = Math.min(95, Math.max(5, ((liveNum - minR) / Math.max(0.01, maxR - minR)) * 100));
+
       html += `
-        <tr>
+        <tr class="${isGain ? 'row-profit' : 'row-loss'}">
           <td>
             <div class="symbol-cell" onclick="app.openTickerAnalysisModal('${p.symbol}')" style="cursor: pointer;" title="Haz clic para análisis 360° de ${p.symbol}">
               <div class="symbol-avatar">${p.symbol.substring(0, 3)}</div>
               <div>
-                <div class="symbol-name" style="color: var(--accent-blue); text-decoration: underline dotted;">${p.symbol} 🔍</div>
-                <div class="symbol-sub">${p.original_name || p.symbol}</div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span class="holding-index-badge">#${idx + 1}</span>
+                  <span class="symbol-name" style="color: var(--accent-blue); text-decoration: underline dotted; font-size: 14px;">${p.symbol} 🔍</span>
+                </div>
+                <div class="symbol-sub">${p.original_name || p.symbol} • <strong>${p.daysHeld} días</strong></div>
               </div>
             </div>
           </td>
-          <td>${p.buy_date || '-'}</td>
-          <td><strong>${p.quantity}</strong></td>
-          <td>$${p.buy_price.toFixed(2)}</td>
-          <td>$${p.buy_total.toFixed(2)}</td>
           <td>
-            <strong style="color: var(--text-main);">$${p.livePrice.toFixed(2)}</strong>
-            <span class="${p.change >= 0 ? 'text-success' : 'text-danger'}" style="font-size: 11px; margin-left: 4px; font-weight: 700;">
-              ${p.change >= 0 ? '+' : ''}${p.changePercent.toFixed(1)}%
-            </span>
-          </td>
-          <td><strong>$${p.currentValue.toFixed(2)}</strong></td>
-          <td class="${isGain ? 'text-success' : 'text-danger'}" style="font-weight: 800;">
-            ${isGain ? '+' : ''}$${p.unrealizedGain.toFixed(2)}
+            <div style="font-weight: 800; color: var(--text-main); font-family: var(--font-mono);">${p.quantity} acc a ${p.buy_price.toFixed(2)}</div>
+            <div style="font-size: 11px; color: var(--text-muted);">📅 Compra: ${p.buy_date || '-'}</div>
           </td>
           <td>
-            <span class="${isGain ? 'badge-up' : 'badge-down'}">
+            <div style="font-size: 14.5px; font-weight: 800; font-family: var(--font-mono); color: var(--text-main);">${liveNum.toFixed(2)}</div>
+            <div class="${p.change >= 0 ? 'text-success' : 'text-danger'}" style="font-size: 11.5px; font-weight: 700;">
+              ${p.change >= 0 ? '▲ +' : '▼ '}${p.changePercent.toFixed(2)}% hoy
+            </div>
+          </td>
+          <td>
+            <div style="font-size: 11.5px; color: var(--text-secondary);">Invertido: <strong>${p.buy_total.toFixed(2)}</strong></div>
+            <div style="font-size: 14px; font-weight: 800; font-family: var(--font-mono); color: var(--text-main);">Hoy: ${p.currentValue.toFixed(2)}</div>
+          </td>
+          <td>
+            <div class="${isGain ? 'text-success' : 'text-danger'}" style="font-weight: 800; font-size: 14.5px; font-family: var(--font-mono);">
+              ${isGain ? '+' : ''}${p.unrealizedGain.toFixed(2)}
+            </div>
+            <span class="${isGain ? 'badge-up' : 'badge-down'}" style="display: inline-block; margin-top: 3px;">
               ${isGain ? '+' : ''}${p.unrealizedGainPercent.toFixed(2)}%
             </span>
           </td>
-          <td>${p.daysHeld}d</td>
+          <td style="min-width: 175px;">
+            <div style="display: flex; justify-content: space-between; font-size: 10.5px; font-family: var(--font-mono); font-weight: 700; margin-bottom: 4px;">
+              <span style="color: var(--danger);">🛡️ ${stopPrice.toFixed(2)}</span>
+              <span style="color: var(--primary-hover);">🎯 ${targetPrice.toFixed(2)}</span>
+            </div>
+            <div class="holding-range-track" style="height: 6px;">
+              <div class="holding-range-fill" style="width: ${pctNow}%;"></div>
+              <div class="holding-range-marker-now" style="left: ${pctNow}%; width: 11px; height: 11px; top: -3px;"></div>
+            </div>
+          </td>
           <td>
             <div onclick="app.openForecastModal(${p.id})" style="cursor: pointer;" title="Haz clic para ver la instrucción para Racional Premium y Simulador DCA">
-              <span class="${p.forecast.racionalAction === 'VENDER' ? 'badge-down' : (p.forecast.racionalAction === 'COMPRAR+' ? 'badge-up' : 'badge-neutral')}" style="font-size: 11.5px; padding: 4px 10px; font-weight: 800;">
-                📲 ${p.forecast.racionalBadge || '🔵 MANTENER POSICIÓN'}
+              <span class="${fc.racionalAction === 'VENDER' ? 'badge-down' : (fc.racionalAction === 'COMPRAR+' ? 'badge-up' : 'badge-neutral')}" style="font-size: 11.5px; padding: 5px 10px; font-weight: 800; display: inline-block;">
+                📲 ${fc.racionalBadge || '🔵 MANTENER POSICIÓN'}
               </span>
-              <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px; font-weight: 700; font-family: var(--font-mono);">
-                ⚡ ${p.forecast.kalshiProb || 60}% Prob • 🎯 $${(p.forecast.targetPrice || 0).toFixed(2)} • 1:${p.forecast.riskRewardRatio || 2.0}
+              <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 4px; font-weight: 700; font-family: var(--font-mono);">
+                ⚡ ${fc.kalshiProb || 60}% Prob • R/R 1:${fc.riskRewardRatio || 2.0}
               </div>
             </div>
           </td>
           <td style="text-align: center;">
             <div style="display: flex; gap: 6px; justify-content: center;">
-              <button class="btn btn-success" style="padding: 6px 10px; font-weight: 700; font-size: 11px;" onclick="app.openSellModal(${p.id}, '${p.symbol}', ${p.livePrice})">
-                💵 VENDER
+              <button class="btn btn-success" style="padding: 6px 10px; font-weight: 700; font-size: 11px;" onclick="app.openSellModal(${p.id}, '${p.symbol}', ${liveNum})">
+                💵 Vender
               </button>
               <button class="btn btn-secondary" style="padding: 6px 8px; font-size: 11px; color: var(--accent-blue);" onclick="app.openTickerAnalysisModal('${p.symbol}')" title="Análisis 360°">
                 🔍
               </button>
-              <button class="btn btn-secondary" style="padding: 6px 8px; font-size: 11px;" onclick="app.openForecastModal(${p.id})" title="Ver Pronóstico">
-                🤖
+              <button class="btn btn-secondary" style="padding: 6px 8px; font-size: 11px;" onclick="app.openForecastModal(${p.id})" title="Ver Pronóstico y Simulador DCA">
+                📲
               </button>
-              <button class="btn btn-secondary" style="padding: 6px 8px; font-size: 11px;" onclick="app.openEditModal(${p.id})" title="Editar">
+              <button class="btn btn-secondary" style="padding: 6px 8px; font-size: 11px;" onclick="app.openEditModal(${p.id})" title="Editar Posición">
                 ✏️
               </button>
             </div>
@@ -1928,19 +1997,25 @@ const app = {
     }
   },
 
-  quickBuyCurrentTicker() {
+  quickBuyCurrentTicker(symbol, livePrice) {
+    const targetSym = (symbol || this.currentAnalyzedSymbol || '').trim().toUpperCase();
     this.closeTickerAnalysisModal();
     this.openBuyModal();
     const symInput = document.getElementById('buy-symbol');
-    if (symInput) {
-      symInput.value = this.currentAnalyzedSymbol;
+    if (symInput && targetSym) {
+      symInput.value = targetSym;
+    }
+    const priceInput = document.getElementById('buy-price');
+    if (priceInput && livePrice && !isNaN(livePrice)) {
+      priceInput.value = parseFloat(livePrice).toFixed(2);
     }
   },
 
-  quickSellCurrentTicker() {
+  quickSellCurrentTicker(symbol, qty, livePrice) {
+    const targetSym = (symbol || this.currentAnalyzedSymbol || '').trim().toUpperCase();
     this.closeTickerAnalysisModal();
     const openPositions = (this.data && this.data.openPositions) || [];
-    const target = openPositions.find(p => p.symbol.trim().toUpperCase() === this.currentAnalyzedSymbol);
+    const target = openPositions.find(p => p.symbol.trim().toUpperCase() === targetSym);
     if (target) {
       this.openSellModal(target.id, target.symbol, target.livePrice);
     } else {
@@ -2786,7 +2861,226 @@ const app = {
     } catch (err) {
       alert('Error eliminando la transacción: ' + err.message);
     }
-  }
+  },
+
+  // ============================================================================
+  // DICCIONARIO Y SISTEMA INTERACTIVO DE EXPLICACIÓN DE INDICADORES Y FÓRMULAS
+  // ============================================================================
+  indicatorExplanations: {
+    unrealized_gain: {
+      title: 'Ganancia / Pérdida Flotante (No Realizada)',
+      summary: 'Muestra cuánto dinero vas ganando o perdiendo en tus acciones actualmente abiertas si decidieras venderlas hoy al precio de mercado en EE.UU.',
+      formula: 'Ganancia ($) = (Precio Hoy - Precio Compra) × Cantidad de Acciones  |  Retorno (%) = ((Valor Hoy - Capital Invertido) / Capital Invertido) × 100',
+      source: '📡 Origen: Cotización en vivo de Yahoo Finance NY vs tu precio de compra registrado en la base de datos.'
+    },
+    portfolio_value: {
+      title: 'Valor Actual del Portafolio',
+      summary: 'Es el valor total de mercado en dólares (USD) que suman todas tus posiciones abiertas en este instante.',
+      formula: 'Valor Portafolio = Σ (Cantidad de Acciones de cada posición × Precio Actual en Vivo)',
+      source: '📡 Origen: Suma en tiempo real (cada 15 seg) de tus acciones multiplicadas por su cotización en Wall Street.'
+    },
+    open_invested: {
+      title: 'Capital Abierto Invertido (Costo Base)',
+      summary: 'Es el dinero total que desembolsaste originalmente para comprar las acciones que hoy mantienes abiertas.',
+      formula: 'Capital Abierto = Σ (Cantidad Comprada × Precio de Compra Unitario)',
+      source: '📡 Origen: Registro exacto de tus compras activas guardadas en tu cartera.'
+    },
+    daily_change: {
+      title: 'Variación del Día (Cambio Intradía)',
+      summary: 'Indica cuánto ha subido o bajado tu cartera (o una acción) únicamente durante la sesión bursátil de hoy respecto al cierre de ayer.',
+      formula: 'Cambio Hoy ($) = (Precio Actual - Precio Cierre Ayer) × Acciones  |  Cambio Hoy (%) = ((Precio Actual - Cierre Ayer) / Cierre Ayer) × 100',
+      source: '📡 Origen: Comparación directa contra el cierre oficial del día hábil anterior en NYSE / NASDAQ.'
+    },
+    realized_gain: {
+      title: 'Ganancias Cerradas (Ventas Ejecutadas)',
+      summary: 'Es la utilidad o pérdida real ya asegurada en dólares por todas las ventas históricas que has cerrado.',
+      formula: 'Ganancia Realizada = Σ ((Precio de Venta - Precio de Compra) × Acciones Vendidas)',
+      source: '📡 Origen: Historial acumulado de tus operaciones cerradas en la pestaña Historial de Ventas.'
+    },
+    win_rate: {
+      title: 'Efectividad Histórica (Win Rate %)',
+      summary: 'Porcentaje de tus ventas históricas que terminaron con ganancia positiva (en verde) sobre el total de ventas realizadas.',
+      formula: 'Win Rate (%) = (Número de Ventas con Ganancia > $0 / Total de Ventas Cerradas) × 100',
+      source: '📡 Origen: Estadística calculada sobre todas tus operaciones cerradas.'
+    },
+    kalshi_prob: {
+      title: 'Probabilidad Alcista Multifactorial (Kalshi Score 5%-95%)',
+      summary: 'Inspirado en los mercados predictivos de Kalshi, estima la probabilidad técnica de que la acción suba en el corto/mediano plazo combinando 5 factores cuantitativos.',
+      formula: 'Score = Base 50% + Tendencia SMA50/200 (±15%) + Momentum RSI 14d (±12%) + Cruce MACD (±10%) + Flujo Volumen RVOL (±8%) + Posición en Rango (±8%)',
+      source: '📡 Origen: Motor cuantitativo propio sobre velas históricas diarias de Yahoo Finance.'
+    },
+    top_conviction: {
+      title: 'Mayor Convicción Técnica de la Cartera',
+      summary: 'Identifica automáticamente cuál de tus acciones abiertas tiene hoy el Kalshi Score más alto y la mejor relación Riesgo/Beneficio.',
+      formula: 'Máximo (Kalshi Probabilidad % × Factor Tendencia Alcista) entre tus posiciones activas',
+      source: '📡 Origen: Ranking automático en tiempo real de tus posiciones abiertas.'
+    },
+    concentration: {
+      title: 'Exposición Máxima / Riesgo de Concentración',
+      summary: 'Mide qué porcentaje de todo tu dinero está concentrado en una sola acción. Si supera el 35%-40%, el riesgo específico de esa empresa domina tu cartera.',
+      formula: 'Concentración (%) = (Valor Actual de tu Mayor Posición / Valor Total del Portafolio) × 100',
+      source: '📡 Origen: Ponderación porcentual del valor de mercado actual de cada posición.'
+    },
+    portfolio_health: {
+      title: 'Semáforo de Salud Cuantitativa',
+      summary: 'Evalúa el equilibrio general de tu cartera combinando la probabilidad media alcista, la diversificación y cuántas posiciones están sobre su media móvil.',
+      formula: 'Salud = Promedio Ponderado(Kalshi Score Cartera) - Penalización si Concentración > 40% o si >50% de acciones están bajo Stop',
+      source: '📡 Origen: Diagnóstico integral de riesgo de tu portafolio.'
+    },
+    racional_signals: {
+      title: 'Señal de Ejecución para Racional (Comprar+, Vender o Mantener)',
+      summary: 'Traduce todos los indicadores técnicos a una instrucción clara para ejecutar en tu cuenta de Racional: COMPRAR+ (acumular), VENDER (tomar ganancia o proteger stop) o MANTENER.',
+      formula: '🟢 COMPRAR+: Kalshi ≥ 62% y R/R ≥ 1.6  |  🔴 VENDER: Precio ≤ Stop Loss o RSI > 76 con agotamiento  |  🔵 MANTENER: En zona neutral o rumbo a la meta',
+      source: '📡 Origen: Reglas de decisión del motor de pronósticos cruzadas con tu precio promedio de compra.'
+    },
+    alpha_sp500: {
+      title: 'Comparativa vs Benchmark S&P 500 (Alpha)',
+      summary: 'Compara el rendimiento porcentual de tu cartera contra el índice S&P 500 (ETF SPY) en el mismo período. Si tu línea verde supera a la azul, estás batiendo al mercado.',
+      formula: 'Alpha (%) = Retorno Cartera (%) - Retorno S&P 500 (SPY) (%) en el período seleccionado',
+      source: '📡 Origen: Serie histórica normalizada Base 100 de tus posiciones vs cotización oficial de SPY.'
+    },
+    rsi: {
+      title: 'RSI de 14 Días (Índice de Fuerza Relativa)',
+      summary: 'Mide la velocidad de las subidas y caídas en una escala de 0 a 100. Detecta si una acción está "barata/sobrevendida" (≤32, posible rebote) o "cara/sobrecomprada" (≥70, riesgo de toma de ganancias).',
+      formula: 'RSI = 100 - [100 / (1 + (Promedio Ganancias 14d / Promedio Pérdidas 14d))]',
+      source: '📡 Origen: Calculado sobre los últimos 14 cierres diarios de la acción en EE.UU.'
+    },
+    macd: {
+      title: 'MACD (12, 26, 9) - Convergencia/Divergencia de Medias',
+      summary: 'Detecta cambios en el impulso (momentum) de la tendencia. Cuando la línea rápida cruza por encima de la línea de señal, genera un impulso ALCISTA.',
+      formula: 'Línea MACD = EMA(12 días) - EMA(26 días)  |  Señal = EMA(9 días del MACD)  |  Histograma = MACD - Señal',
+      source: '📡 Origen: Medias móviles exponenciales de los cierres históricos.'
+    },
+    atr: {
+      title: 'ATR de 14 Días (Average True Range / Volatilidad)',
+      summary: 'Mide cuántos dólares se mueve en promedio la acción cada día. Sirve para proyectar el rango de los próximos 5 días y colocar un Stop Loss que no te saque por ruido normal.',
+      formula: 'TR = Máx[(Alto - Bajo), |Alto - Cierre Ayer|, |Bajo - Cierre Ayer|]  |  ATR = Promedio de 14 días del TR',
+      source: '📡 Origen: Rango diario de precios máximos, mínimos y cierres de las últimas 3 semanas.'
+    },
+    sma: {
+      title: 'Medias Móviles Simples (SMA 50d y SMA 200d)',
+      summary: 'Representan el precio promedio de los últimos 50 días (tendencia intermedia) y 200 días (tendencia de largo plazo). Si el precio actual está por encima, la estructura es alcista.',
+      formula: 'SMA(N) = (Suma de los Precios de Cierre de los últimos N días) / N',
+      source: '📡 Origen: Historial de cierres diarios del último año bursátil.'
+    },
+    support_resistance: {
+      title: 'Soporte (Piso) y Resistencia (Techo)',
+      summary: 'El Soporte es la zona de precio inferior donde históricamente entran compradores a frenar caídas. La Resistencia es el techo reciente donde suelen aparecer vendedores.',
+      formula: 'Soporte = Mínimo relevante de las últimas 20 sesiones / Banda ATR inferior  |  Resistencia = Máximo de 20 sesiones / Proyección ATR superior',
+      source: '📡 Origen: Acción del precio y bandas de volatilidad de los últimos 20-50 días.'
+    },
+    stop_loss: {
+      title: 'Stop Loss Dinámico / Trailing Stop (Protección)',
+      summary: 'Es el precio límite sugerido para vender y proteger tu capital si el mercado se da vuelta. Si ya llevas buena ganancia, se convierte en Trailing Stop para asegurar utilidades.',
+      formula: 'Stop Dinámico = Precio Actual - (2.0 × ATR 14d)  (ajustado sobre soporte técnico o protección de ganancia)',
+      source: '📡 Origen: Calculado dinámicamente según la volatilidad ATR de cada acción.'
+    },
+    target_price: {
+      title: 'Precio Objetivo (Meta / Take Profit)',
+      summary: 'Es la meta de precio proyectada donde la acción alcanzaría su techo técnico o completaría su movimiento alcista esperado.',
+      formula: 'Precio Meta = Máximo entre (Resistencia de 20d) y (Precio Actual + 3.2 × ATR 14d)',
+      source: '📡 Origen: Proyección cuantitativa de volatilidad y techos históricos.'
+    },
+    stop_target: {
+      title: 'Termómetro Visual de Rango (Stop ── Compra ── Hoy ── Meta)',
+      summary: 'Te permite ver de un solo vistazo dónde está parado el precio de hoy respecto a tu precio de compra, tu piso de protección (Stop) y tu meta de ganancia.',
+      formula: 'Posición (%) = ((Precio Hoy - Precio Stop) / (Precio Meta - Precio Stop)) × 100',
+      source: '📡 Origen: Comparativa visual en vivo entre tu Stop Loss, tu Compra, el Precio Actual y la Meta.'
+    },
+    risk_reward: {
+      title: 'Relación Riesgo / Beneficio (Ratio R/R)',
+      summary: 'Compara cuántos dólares puedes ganar hasta la Meta por cada $1 dólar que arriesgas hasta el Stop Loss. Un ratio de 1:2.0 o superior significa que el potencial duplica al riesgo.',
+      formula: 'Ratio R/R = (Precio Meta - Precio Actual) / (Precio Actual - Precio Stop Loss)',
+      source: '📡 Origen: División entre el potencial alcista (Upside) y el riesgo hasta el Stop (Downside).'
+    },
+    dca_simulator: {
+      title: 'Simulador de Promediar / Acumular (DCA - Dollar Cost Averaging)',
+      summary: 'Calcula cómo cambiaría tu precio promedio por acción si decides invertir dólares adicionales hoy en Racional, y cuánto ganarías cuando la acción llegue a su Precio Meta.',
+      formula: 'Nuevo Precio Promedio = (Capital Invertido Actual + Nuevos USD) / (Acciones Actuales + (Nuevos USD / Precio Hoy))',
+      source: '📡 Origen: Simulación matemática instantánea con el precio en vivo de la acción.'
+    }
+  },
+
+  showIndicatorTooltip(evt, key) {
+    const info = this.indicatorExplanations[key];
+    const tooltip = document.getElementById('indicator-floating-tooltip');
+    if (!info || !tooltip) return;
+
+    document.getElementById('ift-title').innerText = info.title;
+    document.getElementById('ift-summary').innerText = info.summary;
+    document.getElementById('ift-formula').innerText = info.formula;
+    document.getElementById('ift-source').innerText = info.source;
+
+    tooltip.style.display = 'block';
+
+    const rect = evt.currentTarget.getBoundingClientRect();
+    const ttWidth = 350;
+    let left = rect.left + (rect.width / 2) - (ttWidth / 2);
+    if (left < 12) left = 12;
+    if (left + ttWidth > window.innerWidth - 12) {
+      left = window.innerWidth - ttWidth - 12;
+    }
+
+    let top = rect.bottom + 10;
+    if (top + 230 > window.innerHeight) {
+      top = Math.max(12, rect.top - 225);
+    }
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+  },
+
+  hideIndicatorTooltip() {
+    const tooltip = document.getElementById('indicator-floating-tooltip');
+    if (tooltip) tooltip.style.display = 'none';
+  },
+
+  showIndicatorHelp(key) {
+    this.hideIndicatorTooltip();
+    this.openIndicatorGuideModal(key);
+  },
+
+  openIndicatorGuideModal(selectedKey = null) {
+    const modal = document.getElementById('modal-indicator-guide');
+    const spotBox = document.getElementById('ig-selected-spotlight');
+    const grid = document.getElementById('ig-all-cards-grid');
+    if (!modal || !grid) return;
+
+    if (selectedKey && this.indicatorExplanations[selectedKey]) {
+      const sel = this.indicatorExplanations[selectedKey];
+      spotBox.style.display = 'block';
+      document.getElementById('ig-spot-title').innerText = sel.title;
+      document.getElementById('ig-spot-desc').innerText = sel.summary;
+      document.getElementById('ig-spot-formula').innerText = '📐 Fórmula: ' + sel.formula;
+      document.getElementById('ig-spot-decision').innerText = sel.source;
+    } else {
+      spotBox.style.display = 'none';
+    }
+
+    let cardsHtml = '';
+    Object.entries(this.indicatorExplanations).forEach(([k, item]) => {
+      const isSelected = k === selectedKey;
+      cardsHtml += `
+        <div class="indicator-guide-card ${isSelected ? 'active-guide-card' : ''}">
+          <div style="font-size: 14px; font-weight: 800; color: var(--text-main);">${item.title}</div>
+          <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.45;">${item.summary}</div>
+          <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-left: 3px solid var(--accent-blue); border-radius: 6px; padding: 7px 10px; font-family: var(--font-mono); font-size: 11px; color: var(--accent-blue); font-weight: 700;">
+            ${item.formula}
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">${item.source}</div>
+        </div>
+      `;
+    });
+
+    grid.innerHTML = cardsHtml;
+    modal.classList.add('active');
+  },
+
+  closeIndicatorGuideModal() {
+    const modal = document.getElementById('modal-indicator-guide');
+    if (modal) modal.classList.remove('active');
+  },
+
 };
 
 document.addEventListener('DOMContentLoaded', () => app.init());

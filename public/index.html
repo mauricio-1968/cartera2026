@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   
   <!-- CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=3.2.2">
+  <link rel="stylesheet" href="/css/styles.css?v=3.3.0">
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -61,6 +61,10 @@
           <span id="theme-icon">☀️</span> <span id="theme-text">Modo Claro</span>
         </button>
 
+        <button class="btn btn-secondary" onclick="app.openIndicatorGuideModal()" style="border-color: rgba(16, 185, 129, 0.45); color: var(--primary-hover); font-weight: 800;" title="Ver explicación paso a paso y fórmulas de todos los indicadores">
+          📘 ¿Cómo se Calcula?
+        </button>
+
         <button class="btn btn-secondary" onclick="app.openTickerAnalysisModal()" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8; font-weight: 700;">
           🔍 Analizar Ticker
         </button>
@@ -96,7 +100,7 @@
         <div class="hero-floating-left">
           <div class="hero-label">
             <span class="hero-pulse-dot"></span>
-            <span>Ganancia Flotante No Realizada (Posiciones Abiertas)</span>
+            <span>Ganancia Flotante No Realizada (Posiciones Abiertas)</span> <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('unrealized_gain')" onmouseenter="app.showIndicatorTooltip(event, 'unrealized_gain')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ ¿Cómo se calcula?</span>
           </div>
           <div class="hero-value-wrapper" style="display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 4px;">
             <span class="hero-value" id="hero-floating-val">+$0.00</span>
@@ -105,15 +109,15 @@
           
           <div class="hero-chips-container">
             <div class="hero-chip">
-              <span class="hero-chip-label">Valor Portafolio:</span>
+              <span class="hero-chip-label">Valor Portafolio <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('portfolio_value')" onmouseenter="app.showIndicatorTooltip(event, 'portfolio_value')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span>:</span>
               <strong id="hero-total-portfolio">$0.00</strong>
             </div>
             <div class="hero-chip">
-              <span class="hero-chip-label">Capital Abierto:</span>
+              <span class="hero-chip-label">Capital Abierto <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('open_invested')" onmouseenter="app.showIndicatorTooltip(event, 'open_invested')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span>:</span>
               <strong id="hero-open-invested">$0.00</strong>
             </div>
             <div class="hero-chip">
-              <span class="hero-chip-label">Variación Hoy:</span>
+              <span class="hero-chip-label">Variación Hoy <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('daily_change')" onmouseenter="app.showIndicatorTooltip(event, 'daily_change')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span>:</span>
               <strong id="hero-daily-change">$0.00</strong>
             </div>
           </div>
@@ -121,11 +125,11 @@
 
         <div class="hero-floating-right">
           <div class="hero-metric-row">
-            <span class="hero-metric-title">💵 Ganancias Cerradas (Ventas):</span>
+            <span class="hero-metric-title">💵 Ganancias Cerradas (Ventas) <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('realized_gain')" onmouseenter="app.showIndicatorTooltip(event, 'realized_gain')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span>:</span>
             <span class="hero-metric-val text-success" id="hero-closed-realized">+$0.00</span>
           </div>
           <div class="hero-metric-row">
-            <span class="hero-metric-title">🏆 Efectividad Histórica (Win Rate):</span>
+            <span class="hero-metric-title">🏆 Efectividad Histórica (Win Rate) <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('win_rate')" onmouseenter="app.showIndicatorTooltip(event, 'win_rate')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span>:</span>
             <span class="hero-metric-val" id="hero-winrate">0.0%</span>
           </div>
           <div class="hero-metric-row">
@@ -138,7 +142,7 @@
       <!-- BARRA CUANTITATIVA KALSHI: SALUD DE CARTERA, PROBABILIDAD ALCISTA Y CONCENTRACIÓN -->
       <div class="kalshi-quant-bar" id="kalshi-quant-bar">
         <div class="kalshi-quant-item">
-          <div class="kalshi-quant-label">⚡ PROBABILIDAD ALCISTA CARTERA (KALSHI SCORE)</div>
+          <div class="kalshi-quant-label">⚡ PROBABILIDAD ALCISTA CARTERA (KALSHI SCORE) <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('kalshi_prob')" onmouseenter="app.showIndicatorTooltip(event, 'kalshi_prob')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ Fórmula</span></div>
           <div class="kalshi-quant-value-row">
             <span class="kalshi-quant-big" id="kq-portfolio-prob">64%</span>
             <div class="kalshi-prob-meter">
@@ -148,7 +152,7 @@
         </div>
 
         <div class="kalshi-quant-item">
-          <div class="kalshi-quant-label">🏆 MAYOR CONVICCIÓN TÉCNICA</div>
+          <div class="kalshi-quant-label">🏆 MAYOR CONVICCIÓN TÉCNICA <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('top_conviction')" onmouseenter="app.showIndicatorTooltip(event, 'top_conviction')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ ¿Qué es?</span></div>
           <div class="kalshi-quant-value-row">
             <span class="kalshi-quant-ticker" id="kq-top-conviction">-</span>
             <span class="kalshi-quant-pill pill-up" id="kq-top-conviction-prob">0% Prob.</span>
@@ -156,7 +160,7 @@
         </div>
 
         <div class="kalshi-quant-item">
-          <div class="kalshi-quant-label">⚖️ EXPOSICIÓN MÁXIMA / CONCENTRACIÓN</div>
+          <div class="kalshi-quant-label">⚖️ EXPOSICIÓN MÁXIMA / CONCENTRACIÓN <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('concentration')" onmouseenter="app.showIndicatorTooltip(event, 'concentration')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ Fórmula</span></div>
           <div class="kalshi-quant-value-row">
             <span class="kalshi-quant-ticker" id="kq-max-conc-symbol">-</span>
             <span class="kalshi-quant-pill" id="kq-max-conc-pct">0.0%</span>
@@ -164,7 +168,7 @@
         </div>
 
         <div class="kalshi-quant-item">
-          <div class="kalshi-quant-label">🛡️ SEMÁFORO DE SALUD CUANTITATIVA</div>
+          <div class="kalshi-quant-label">🛡️ SEMÁFORO DE SALUD CUANTITATIVA <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('portfolio_health')" onmouseenter="app.showIndicatorTooltip(event, 'portfolio_health')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ Criterio</span></div>
           <div class="kalshi-quant-value-row">
             <span class="kalshi-quant-pill pill-up" id="kq-health-badge">🟢 ÓPTIMA</span>
           </div>
@@ -189,7 +193,7 @@
         <div class="racional-command-bar" id="racional-command-bar">
           <div class="racional-bar-left">
             <span class="racional-logo-badge">📲 RACIONAL PREMIUM</span>
-            <span class="racional-bar-title">Guía de Ejecución Hoy:</span>
+            <span class="racional-bar-title">Guía de Ejecución Hoy <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('racional_signals')" onmouseenter="app.showIndicatorTooltip(event, 'racional_signals')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ ¿Cómo decide Comprar+, Vender o Mantener?</span>:</span>
           </div>
           <div class="racional-filter-pills">
             <button type="button" class="racional-filter-btn active" id="btn-rac-all" onclick="app.filterCardsByRacional('ALL')">
@@ -328,7 +332,7 @@
             <div class="kalshi-chart-title-group">
               <div class="kalshi-eyebrow">
                 <span class="kalshi-live-dot"></span>
-                <span>VALOR DE LA CARTERA VS BENCHMARK S&P 500 (SPY)</span>
+                <span>VALOR DE LA CARTERA VS BENCHMARK S&P 500 (SPY)</span> <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('alpha_sp500')" onmouseenter="app.showIndicatorTooltip(event, 'alpha_sp500')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ ¿Cómo se calcula el Alpha?</span>
                 <span id="kalshi-hist-alpha-badge" class="kalshi-tf-badge" style="background: var(--primary-light); color: var(--primary-hover);">Alpha vs S&P 500: +0.0%</span>
               </div>
               <div class="kalshi-price-hero-row">
@@ -364,10 +368,10 @@
                 <tr>
                   <th>Empresa / Ticker</th>
                   <th>Precio Actual</th>
-                  <th>RSI (14d)</th>
-                  <th>Medias Móviles (50d / 200d)</th>
-                  <th>Soporte / Resistencia</th>
-                  <th>Indicador de Decisión</th>
+                  <th>RSI (14d) <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('rsi')" onmouseenter="app.showIndicatorTooltip(event, 'rsi')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></th>
+                  <th>Medias Móviles (50d / 200d) <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('sma')" onmouseenter="app.showIndicatorTooltip(event, 'sma')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></th>
+                  <th>Soporte / Resistencia <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('support_resistance')" onmouseenter="app.showIndicatorTooltip(event, 'support_resistance')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></th>
+                  <th>Indicador de Decisión <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('racional_signals')" onmouseenter="app.showIndicatorTooltip(event, 'racional_signals')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></th>
                   <th style="text-align: center;">Acción</th>
                 </tr>
               </thead>
@@ -416,21 +420,17 @@
         </div>
 
         <div class="table-responsive">
-          <table class="data-table">
+          <table class="data-table open-positions-table">
             <thead>
               <tr>
-                <th>Ticker / Acción</th>
-                <th>Fecha Compra</th>
-                <th>Cantidad</th>
-                <th>Precio Compra US$</th>
-                <th>Invertido Total US$</th>
-                <th>Precio Actual US$</th>
-                <th>Valor Presente US$</th>
-                <th>Ganancia / Pérdida US$</th>
-                <th>Retorno %</th>
-                <th>Días</th>
-                <th>📲 Acción en Racional & Pronóstico</th>
-                <th style="text-align: center; background: rgba(16, 185, 129, 0.2); color: #10b981;">Operación</th>
+                <th># / Acción</th>
+                <th>Compra & Cantidad <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('open_invested')" onmouseenter="app.showIndicatorTooltip(event, 'open_invested')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></th>
+                <th>Cotización Hoy <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('daily_change')" onmouseenter="app.showIndicatorTooltip(event, 'daily_change')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></th>
+                <th>Inversión vs Valor Hoy <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('portfolio_value')" onmouseenter="app.showIndicatorTooltip(event, 'portfolio_value')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></th>
+                <th>Ganancia / Retorno % <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('unrealized_gain')" onmouseenter="app.showIndicatorTooltip(event, 'unrealized_gain')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></th>
+                <th>Rango: Stop ── Meta <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('stop_target')" onmouseenter="app.showIndicatorTooltip(event, 'stop_target')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></th>
+                <th>📲 Acción en Racional <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('racional_signals')" onmouseenter="app.showIndicatorTooltip(event, 'racional_signals')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></th>
+                <th style="text-align: center;">Operar</th>
               </tr>
             </thead>
             <tbody id="tbody-open">
@@ -757,14 +757,14 @@
       <div class="kalshi-modal-prob-card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
           <div>
-            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">PROBABILIDAD ALCISTA MULTIFACTORIAL (KALSHI SCORE)</div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">PROBABILIDAD ALCISTA MULTIFACTORIAL (KALSHI SCORE) <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('kalshi_prob')" onmouseenter="app.showIndicatorTooltip(event, 'kalshi_prob')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ Ver cálculo</span></div>
             <div style="display: flex; align-items: baseline; gap: 10px; margin-top: 2px;">
               <span id="fc-modal-prob-val" style="font-family: var(--font-display); font-size: 32px; font-weight: 800; color: var(--primary);">74%</span>
               <span id="fc-modal-signals" style="display: flex; gap: 6px; flex-wrap: wrap;"></span>
             </div>
           </div>
           <div style="text-align: right;">
-            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Relación Riesgo / Beneficio</div>
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Relación Riesgo / Beneficio <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('risk_reward')" onmouseenter="app.showIndicatorTooltip(event, 'risk_reward')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></div>
             <div id="fc-modal-rr" style="font-family: var(--font-mono); font-size: 18px; font-weight: 800; color: var(--text-main);">1 : 2.5</div>
           </div>
         </div>
@@ -776,13 +776,13 @@
       <!-- Decisión para Racional Premium y Horizonte -->
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
         <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: 10px; border: 1px solid var(--border-color);">
-          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">📲 Acción en Racional Premium</div>
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">📲 Acción en Racional Premium <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('racional_signals')" onmouseenter="app.showIndicatorTooltip(event, 'racional_signals')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></div>
           <div id="fc-modal-action" style="font-size: 18px; font-weight: 800; margin-top: 4px;">🔵 MANTENER POSICIÓN</div>
           <div id="fc-modal-racional-sub" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">No operar hoy en Racional</div>
         </div>
 
         <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: 10px; border: 1px solid var(--border-color);">
-          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Horizonte & Rango 5D (ATR)</div>
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Horizonte & Rango 5D (ATR) <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('atr')" onmouseenter="app.showIndicatorTooltip(event, 'atr')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></div>
           <div id="fc-modal-horizon" style="font-size: 16px; font-weight: 800; color: var(--accent-blue); margin-top: 4px;">2 a 3 Semanas</div>
           <div id="fc-modal-atr-range" style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px;">Rango 5D: $0 - $0</div>
         </div>
@@ -799,7 +799,7 @@
       <!-- Niveles Operativos: Objetivo, Actual/Compra, Stop/Trailing -->
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;">
         <div style="background: var(--primary-light); padding: 12px; border-radius: 10px; border: 1px solid rgba(10, 194, 133, 0.35);">
-          <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">🎯 Objetivo (Take Profit)</div>
+          <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">🎯 Objetivo (Take Profit) <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('target_price')" onmouseenter="app.showIndicatorTooltip(event, 'target_price')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></div>
           <div id="fc-modal-target-price" style="font-family: var(--font-mono); font-size: 17px; font-weight: 800; color: var(--primary-hover); margin-top: 2px;">$345.00</div>
           <div id="fc-modal-target-return" style="font-size: 11px; color: var(--primary-hover); font-weight: 700;">+12.0% Retorno</div>
         </div>
@@ -811,7 +811,7 @@
         </div>
 
         <div style="background: var(--danger-bg); padding: 12px; border-radius: 10px; border: 1px solid rgba(217, 45, 32, 0.3);">
-          <div id="fc-modal-stop-label" style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">🛡️ Stop Dinámico (ATR)</div>
+          <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;"><span id="fc-modal-stop-label">🛡️ Stop Dinámico (ATR)</span> <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('stop_loss')" onmouseenter="app.showIndicatorTooltip(event, 'stop_loss')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></div>
           <div id="fc-modal-stop-price" style="font-family: var(--font-mono); font-size: 17px; font-weight: 800; color: var(--danger); margin-top: 2px;">$285.00</div>
           <div id="fc-modal-stop-dist" style="font-size: 11px; color: var(--danger); font-weight: 600;">Riesgo controlado</div>
         </div>
@@ -828,7 +828,7 @@
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
           <div>
             <div style="font-size: 12px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
-              <span>🧮 Simulador Interactivo de Promediar / Acumular (DCA)</span>
+              <span>🧮 Simulador Interactivo de Promediar / Acumular (DCA)</span> <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('dca_simulator')" onmouseenter="app.showIndicatorTooltip(event, 'dca_simulator')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ ¿Cómo calcula el nuevo promedio?</span>
             </div>
             <div style="font-size: 11px; color: var(--text-muted);">Simula cuánto baja tu precio promedio si compras más acciones hoy al precio de mercado:</div>
           </div>
@@ -1245,32 +1245,32 @@
 
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px;">
               <div style="background: var(--bg-surface); padding: 9px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
-                <div style="font-size: 10px; color: var(--text-muted);">RSI (14d)</div>
+                <div style="font-size: 10px; color: var(--text-muted);">RSI (14d) <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('rsi')" onmouseenter="app.showIndicatorTooltip(event, 'rsi')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></div>
                 <div id="t-tech-rsi" style="font-size: 16px; font-weight: 800; color: var(--accent-blue); margin-top: 2px;">50.0</div>
                 <div id="t-tech-rsi-status" style="font-size: 10px; color: var(--text-muted);">Neutral</div>
               </div>
               <div style="background: var(--bg-surface); padding: 9px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
-                <div style="font-size: 10px; color: var(--text-muted);">MACD (12,26,9)</div>
+                <div style="font-size: 10px; color: var(--text-muted);">MACD (12,26,9) <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('macd')" onmouseenter="app.showIndicatorTooltip(event, 'macd')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></div>
                 <div id="t-tech-macd" style="font-size: 13px; font-weight: 800; color: var(--primary-hover); margin-top: 4px;">ALCISTA</div>
                 <div id="t-tech-rvol" style="font-size: 10px; color: var(--text-muted);">RVOL 1.0x</div>
               </div>
               <div style="background: var(--bg-surface); padding: 9px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
-                <div style="font-size: 10px; color: var(--text-muted);">ATR (14d Volat.)</div>
+                <div style="font-size: 10px; color: var(--text-muted);">ATR (14d Volat.) <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('atr')" onmouseenter="app.showIndicatorTooltip(event, 'atr')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></div>
                 <div id="t-tech-atr" style="font-size: 16px; font-weight: 800; color: var(--text-main); margin-top: 2px;">$0.00</div>
                 <div id="t-tech-rr" style="font-size: 10px; color: var(--text-muted);">R/R 1:2.0</div>
               </div>
               <div style="background: var(--bg-surface); padding: 9px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
-                <div style="font-size: 10px; color: var(--text-muted);">Media SMA 50d</div>
+                <div style="font-size: 10px; color: var(--text-muted);">Media SMA 50d <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('sma')" onmouseenter="app.showIndicatorTooltip(event, 'sma')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></div>
                 <div id="t-tech-sma50" style="font-size: 16px; font-weight: 800; color: var(--accent-blue); margin-top: 2px;">$0.00</div>
                 <div style="font-size: 10px; color: var(--text-muted);">Tendencia</div>
               </div>
               <div style="background: var(--bg-surface); padding: 9px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
-                <div style="font-size: 10px; color: var(--text-muted);">Soporte / Stop</div>
+                <div style="font-size: 10px; color: var(--text-muted);">Soporte / Stop <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('stop_loss')" onmouseenter="app.showIndicatorTooltip(event, 'stop_loss')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></div>
                 <div id="t-tech-support" style="font-size: 16px; font-weight: 800; color: var(--primary-hover); margin-top: 2px;">$0.00</div>
                 <div style="font-size: 10px; color: var(--text-muted);">Piso Técnico</div>
               </div>
               <div style="background: var(--bg-surface); padding: 9px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color);">
-                <div style="font-size: 10px; color: var(--text-muted);">Objetivo / Techo</div>
+                <div style="font-size: 10px; color: var(--text-muted);">Objetivo / Techo <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('target_price')" onmouseenter="app.showIndicatorTooltip(event, 'target_price')" onmouseleave="app.hideIndicatorTooltip()" title="Haz clic o pasa el cursor para ver cómo se calcula">ⓘ</span></div>
                 <div id="t-tech-resistance" style="font-size: 16px; font-weight: 800; color: var(--danger); margin-top: 2px;">$0.00</div>
                 <div style="font-size: 10px; color: var(--text-muted);">Take Profit</div>
               </div>
@@ -1305,7 +1305,60 @@
     </div>
   </div>
 
+  
+  <!-- POPOVER FLOTANTE DE EXPLICACIÓN DE INDICADORES Y FÓRMULAS -->
+  <div id="indicator-floating-tooltip" class="indicator-floating-tooltip" style="display: none;">
+    <div class="ift-header">
+      <span id="ift-title">Indicador</span>
+      <span class="ift-tag">Fórmula & Origen</span>
+    </div>
+    <div id="ift-summary" class="ift-summary"></div>
+    <div class="ift-formula-box">
+      <div class="ift-formula-label">📐 CÓMO SE CALCULA / FÓRMULA:</div>
+      <div id="ift-formula" class="ift-formula-code"></div>
+    </div>
+    <div id="ift-source" class="ift-source"></div>
+    <div class="ift-footer-hint">💡 Haz clic en ⓘ para abrir la guía completa de indicadores</div>
+  </div>
+
+  <!-- MODAL: GUÍA INTERACTIVA DE INDICADORES, CÁLCULOS Y FÓRMULAS -->
+  <div class="modal-backdrop" id="modal-indicator-guide">
+    <div class="modal-box" style="max-width: 820px; max-height: 90vh; overflow-y: auto;">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <span>📘 Guía Transparente de Indicadores y Cálculos</span>
+          <span class="brand-badge">Fórmulas Exactas</span>
+        </div>
+        <button class="modal-close" onclick="app.closeIndicatorGuideModal()">✕</button>
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-secondary); margin: 0 0 16px 0; line-height: 1.5;">
+        Aquí puedes consultar exactamente <strong>qué significa cada término</strong>, <strong>cuál es su fórmula matemática</strong> y <strong>de dónde se obtienen los datos</strong> en tiempo real para generar tus recomendaciones en Racional.
+      </p>
+
+      <!-- Destacado del Indicador Seleccionado -->
+      <div id="ig-selected-spotlight" style="display: none; background: var(--primary-light); border: 2px solid var(--primary); border-radius: 12px; padding: 16px 18px; margin-bottom: 20px;">
+        <div style="font-size: 11px; font-weight: 800; color: var(--primary-hover); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+          🔍 INDICADOR SELECCIONADO
+        </div>
+        <div id="ig-spot-title" style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 6px;"></div>
+        <div id="ig-spot-desc" style="font-size: 13.5px; color: var(--text-main); line-height: 1.55; margin-bottom: 10px;"></div>
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px; font-family: var(--font-mono); font-size: 12.5px; color: var(--accent-blue); font-weight: 700; margin-bottom: 8px;" id="ig-spot-formula"></div>
+        <div id="ig-spot-decision" style="font-size: 12.5px; color: var(--text-secondary); font-weight: 600;"></div>
+      </div>
+
+      <!-- Listado Completo de Fórmulas e Indicadores -->
+      <div id="ig-all-cards-grid" class="indicator-guide-grid">
+        <!-- Renderizado dinámico por app.js -->
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+        <button type="button" class="btn btn-primary" onclick="app.closeIndicatorGuideModal()">Entendido / Cerrar Guía</button>
+      </div>
+    </div>
+  </div>
+
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=3.2.2"></script>
+  <script src="/js/app.js?v=3.3.0"></script>
 </body>
 </html>
