@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   
   <!-- CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=3.3.0">
+  <link rel="stylesheet" href="/css/styles.css?v=3.3.1">
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -183,6 +183,9 @@
             <span class="section-badge-count" id="badge-holdings-count">0 activas</span>
           </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-secondary" style="font-size: 12px; padding: 5px 12px; font-weight: 800; border-color: rgba(16, 185, 129, 0.5); color: var(--primary-hover); background: var(--primary-light);" onclick="app.exportOpenPositionsXls()" title="Descargar informe completo de todas las posiciones abiertas en formato Excel (.xls)">
+              📥 Descargar Excel (.xls)
+            </button>
             <button class="btn btn-secondary" style="font-size: 12px; padding: 5px 12px;" onclick="app.switchTab('open')">
               📑 Ver en Tabla Detallada →
             </button>
@@ -400,9 +403,14 @@
       <div class="card" style="margin-bottom: 20px;">
         <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
           <span>🟢 Posiciones Activas en Cartera (Cotizaciones en Tiempo Real)</span>
-          <button class="btn btn-success" onclick="app.openSellModalFromHeader()" style="padding: 6px 14px; font-size: 13px;">
-            💵 Vender una Acción
-          </button>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button class="btn btn-secondary" onclick="app.exportOpenPositionsXls()" style="padding: 6px 14px; font-size: 13px; font-weight: 800; border-color: rgba(16, 185, 129, 0.55); color: var(--primary-hover); background: var(--primary-light);" title="Descargar informe de todas las posiciones abiertas en formato Excel (.xls)">
+              📥 Descargar Informe Excel (.xls)
+            </button>
+            <button class="btn btn-success" onclick="app.openSellModalFromHeader()" style="padding: 6px 14px; font-size: 13px;">
+              💵 Vender una Acción
+            </button>
+          </div>
         </div>
 
         <!-- Barra de Filtro de Ticker en Posiciones Abiertas -->
@@ -1359,6 +1367,6 @@
   </div>
 
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=3.3.0"></script>
+  <script src="/js/app.js?v=3.3.1"></script>
 </body>
 </html>

@@ -2527,6 +2527,220 @@ const app = {
     window.location.href = url;
   },
 
+  async exportOpenPositionsXls() {
+    try {
+      if (!this.data || !Array.isArray(this.data.openPositions)) {
+        await this.fetchPortfolio();
+      }
+      const openPositions = (this.data && this.data.openPositions) || [];
+      if (openPositions.length === 0) {
+        alert('No hay posiciones abiertas en la cartera para exportar.');
+        return;
+      }
+
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      const timeStr = now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+      const userName = (this.user && this.user.name) ? this.user.name : 'Mauricio Martinez';
+
+      // Calcular totales de todas las posiciones abiertas
+      let totalInvested = 0;
+      let totalCurrentValue = 0;
+      let totalUnrealizedGain = 0;
+      let totalDailyChange = 0;
+
+      openPositions.forEach(p => {
+        const inv = parseFloat(p.buy_total || (p.quantity * p.buy_price) || 0);
+        const cur = parseFloat(p.currentValue || (p.quantity * (p.livePrice || p.buy_price)) || 0);
+        const gain = parseFloat(p.unrealizedGain !== undefined ? p.unrealizedGain : (cur - inv));
+        const dChg = parseFloat(p.dailyChange || 0);
+        totalInvested += inv;
+        totalCurrentValue += cur;
+        totalUnrealizedGain += gain;
+        totalDailyChange += dChg;
+      });
+
+      const totalReturnPct = totalInvested > 0 ? (totalUnrealizedGain / totalInvested) * 100 : 0;
+      const esc = (val) => String(val === null || val === undefined ? '' : val)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+      let rowsHtml = '';
+      openPositions.forEach((p, idx) => {
+        const fc = p.forecast || {};
+        const qty = parseFloat(p.quantity || 0);
+        const buyPrice = parseFloat(p.buy_price || 0);
+        const buyTotal = parseFloat(p.buy_total || (qty * buyPrice) || 0);
+        const livePrice = parseFloat(p.livePrice || buyPrice || 0);
+        const changePct = parseFloat(p.changePercent || 0);
+        const dailyChangeUsd = parseFloat(p.dailyChange || 0);
+        const currentValue = parseFloat(p.currentValue || (qty * livePrice) || 0);
+        const uGain = parseFloat(p.unrealizedGain !== undefined ? p.unrealizedGain : (currentValue - buyTotal));
+        const uPct = parseFloat(p.unrealizedGainPercent !== undefined ? p.unrealizedGainPercent : (buyTotal > 0 ? (uGain / buyTotal) * 100 : 0));
+        const stopPrice = parseFloat(fc.suggestedStopLoss || p.stop_loss || (buyPrice * 0.92));
+        const targetPrice = parseFloat(fc.targetPrice || (buyPrice * 1.15));
+        const kalshiProb = parseInt(fc.kalshiProb || 60, 10);
+        const rrRatio = parseFloat(fc.riskRewardRatio || 2.0);
+        const rAction = fc.racionalAction || 'MANTENER POSICIÓN';
+        const rInstruction = fc.racionalInstruction || fc.reason || '';
+
+        const isGain = uGain >= 0;
+        const isDayUp = changePct >= 0;
+        const gainColor = isGain ? '#065f46' : '#991b1b';
+        const gainBg = isGain ? '#d1fae5' : '#fee2e2';
+        const dayColor = isDayUp ? '#065f46' : '#991b1b';
+
+        let actionBg = '#dbeafe';
+        let actionColor = '#1e40af';
+        if (rAction === 'COMPRAR+') {
+          actionBg = '#d1fae5';
+          actionColor = '#065f46';
+        } else if (rAction === 'VENDER') {
+          actionBg = '#fee2e2';
+          actionColor = '#991b1b';
+        }
+
+        rowsHtml += `
+          <tr>
+            <td style="text-align:center; font-weight:bold;">${idx + 1}</td>
+            <td style="font-weight:bold; color:#1d4ed8;">${esc(p.symbol)}</td>
+            <td>${esc(p.original_name || p.symbol)}</td>
+            <td style="text-align:center;">${esc(p.buy_date || '-')}</td>
+            <td style="text-align:center;" x:num="${p.daysHeld || 0}">${p.daysHeld || 0}</td>
+            <td class="num-qty" x:num="${qty}">${qty.toFixed(4)}</td>
+            <td class="num-usd" x:num="${buyPrice}">${buyPrice.toFixed(2)}</td>
+            <td class="num-usd" style="font-weight:bold;" x:num="${buyTotal}">${buyTotal.toFixed(2)}</td>
+            <td class="num-usd" style="font-weight:bold;" x:num="${livePrice}">${livePrice.toFixed(2)}</td>
+            <td class="num-pct" style="color:${dayColor}; font-weight:bold;" x:num="${changePct}">${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%</td>
+            <td class="num-usd" style="color:${dayColor};" x:num="${dailyChangeUsd}">${dailyChangeUsd.toFixed(2)}</td>
+            <td class="num-usd" style="font-weight:bold;" x:num="${currentValue}">${currentValue.toFixed(2)}</td>
+            <td class="num-usd" style="font-weight:bold; color:${gainColor}; background:${gainBg};" x:num="${uGain}">${uGain.toFixed(2)}</td>
+            <td class="num-pct" style="font-weight:bold; color:${gainColor}; background:${gainBg};" x:num="${uPct}">${uPct >= 0 ? '+' : ''}${uPct.toFixed(2)}%</td>
+            <td class="num-usd" style="color:#991b1b;" x:num="${stopPrice}">${stopPrice.toFixed(2)}</td>
+            <td class="num-usd" style="color:#065f46;" x:num="${targetPrice}">${targetPrice.toFixed(2)}</td>
+            <td style="text-align:center; font-weight:bold;" x:num="${kalshiProb}">${kalshiProb}%</td>
+            <td style="text-align:center;">1:${rrRatio.toFixed(1)}</td>
+            <td style="text-align:center; font-weight:bold; background:${actionBg}; color:${actionColor};">${esc(rAction)}</td>
+            <td>${esc(rInstruction)}</td>
+            <td>${esc(p.notes || '')}</td>
+          </tr>
+        `;
+      });
+
+      const totGainColor = totalUnrealizedGain >= 0 ? '#065f46' : '#991b1b';
+      const totGainBg = totalUnrealizedGain >= 0 ? '#a7f3d0' : '#fecaca';
+      const totDayColor = totalDailyChange >= 0 ? '#065f46' : '#991b1b';
+
+      const excelDoc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="UTF-8">
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>Posiciones Abiertas</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          body { font-family: Arial, Calibri, sans-serif; font-size: 11pt; color: #0f172a; }
+          table { border-collapse: collapse; width: 100%; }
+          th, td { border: 1px solid #cbd5e1; padding: 6px 10px; vertical-align: middle; }
+          th { background-color: #0f172a; color: #ffffff; font-weight: bold; text-align: center; }
+          .title-row { background-color: #064e3b; color: #ffffff; font-size: 14pt; font-weight: bold; text-align: left; padding: 10px; }
+          .sub-row { background-color: #f1f5f9; color: #334155; font-size: 10pt; font-weight: bold; }
+          .num-usd { mso-number-format:"\#\,\#\#0\.00"; text-align: right; }
+          .num-qty { mso-number-format:"0\.0000"; text-align: right; }
+          .num-pct { text-align: right; }
+          .total-row td { background-color: #e2e8f0; font-weight: bold; border-top: 2px solid #0f172a; border-bottom: 2px solid #0f172a; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <tr>
+            <td colspan="21" class="title-row">📈 PORTRACK - INFORME COMPLETO DE POSICIONES ABIERTAS (BOLSA EE.UU.)</td>
+          </tr>
+          <tr>
+            <td colspan="21" class="sub-row">
+              Titular: ${esc(userName)} &nbsp;|&nbsp; Fecha de Informe: ${dateStr} (${timeStr}) &nbsp;|&nbsp; Total Posiciones Activas: ${openPositions.length} acciones
+            </td>
+          </tr>
+          <tr>
+            <td colspan="4" style="background:#f8fafc; font-weight:bold;">Capital Invertido Abierto (US$):</td>
+            <td colspan="2" class="num-usd" style="background:#f8fafc; font-weight:bold;" x:num="${totalInvested}">${totalInvested.toFixed(2)}</td>
+            <td colspan="3" style="background:#f8fafc; font-weight:bold;">Valor Actual Portafolio (US$):</td>
+            <td colspan="2" class="num-usd" style="background:#f8fafc; font-weight:bold;" x:num="${totalCurrentValue}">${totalCurrentValue.toFixed(2)}</td>
+            <td colspan="3" style="background:${totGainBg}; color:${totGainColor}; font-weight:bold;">Ganancia/Pérdida Flotante (US$):</td>
+            <td colspan="2" class="num-usd" style="background:${totGainBg}; color:${totGainColor}; font-weight:bold;" x:num="${totalUnrealizedGain}">${totalUnrealizedGain.toFixed(2)} (${totalReturnPct >= 0 ? '+' : ''}${totalReturnPct.toFixed(2)}%)</td>
+            <td colspan="5" style="background:#f8fafc;"></td>
+          </tr>
+          <tr><td colspan="21" style="border:none; height:8px;"></td></tr>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Ticker</th>
+              <th>Empresa / Acción</th>
+              <th>Fecha Compra</th>
+              <th>Días</th>
+              <th>Cantidad Acciones</th>
+              <th>Precio Compra (US$)</th>
+              <th>Capital Invertido (US$)</th>
+              <th>Cotización Hoy (US$)</th>
+              <th>Variación Hoy (%)</th>
+              <th>Variación Hoy (US$)</th>
+              <th>Valor Actual Hoy (US$)</th>
+              <th>Ganancia Flotante (US$)</th>
+              <th>Rentabilidad (%)</th>
+              <th>Stop Loss / Trailing (US$)</th>
+              <th>Precio Meta / Objetivo (US$)</th>
+              <th>Prob. Kalshi (%)</th>
+              <th>Riesgo / Beneficio</th>
+              <th>Acción en Racional</th>
+              <th>Fundamento &amp; Recomendación Técnica</th>
+              <th>Notas</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+            <tr class="total-row">
+              <td colspan="7" style="text-align:right;">TOTALES CARTERA ABIERTA (${openPositions.length} POSICIONES):</td>
+              <td class="num-usd" x:num="${totalInvested}">${totalInvested.toFixed(2)}</td>
+              <td></td>
+              <td></td>
+              <td class="num-usd" style="color:${totDayColor};" x:num="${totalDailyChange}">${totalDailyChange.toFixed(2)}</td>
+              <td class="num-usd" x:num="${totalCurrentValue}">${totalCurrentValue.toFixed(2)}</td>
+              <td class="num-usd" style="color:${totGainColor}; background:${totGainBg};" x:num="${totalUnrealizedGain}">${totalUnrealizedGain.toFixed(2)}</td>
+              <td class="num-pct" style="color:${totGainColor}; background:${totGainBg};" x:num="${totalReturnPct}">${totalReturnPct >= 0 ? '+' : ''}${totalReturnPct.toFixed(2)}%</td>
+              <td colspan="7"></td>
+            </tr>
+          </tbody>
+        </table>
+      </body>
+      </html>`;
+
+      const blob = new Blob(['\uFEFF', excelDoc], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Portrack_Informe_Posiciones_Abiertas_${dateStr}.xls`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch (err) {
+      alert('Error generando el archivo Excel (.xls): ' + err.message);
+    }
+  },
+
+
   async fetchWatchlist() {
     try {
       const res = await fetch(`/api/watchlist?_t=${Date.now()}`, {
