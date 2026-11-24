@@ -13,6 +13,7 @@ const { getStockPrices, getIntradayChartData } = require('./services/stockPriceS
 const { getPortfolioNews } = require('./services/newsService');
 const { analyzePositionForecast } = require('./services/forecastService');
 const { getTechnicalAnalysis } = require('./services/technicalAnalysisService');
+const { extractPriceAlert, embedPriceAlert, evaluatePriceAlert } = require('./utils/priceAlertMeta');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -233,8 +234,12 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
         stop_loss: row.stop_loss ? parseFloat(row.stop_loss) : null
       }, ta, tickerHist);
 
+      const { cleanNotes, sellAlert } = extractPriceAlert(row.notes || '');
+      const alertInfo = evaluatePriceAlert(sellAlert, currentPrice, parseFloat(row.buy_price), quantity);
+
       return {
         ...row,
+        notes: cleanNotes,
         quantity: parseFloat(row.quantity),
         buy_price: parseFloat(row.buy_price),
         buy_total: parseFloat(row.buy_total),
@@ -247,9 +252,28 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
         unrealizedGainPercent: Number(unrealizedGainPercent.toFixed(2)),
         dailyChange: Number(dailyChange.toFixed(2)),
         daysHeld: daysHeld,
+        ...alertInfo,
         forecast: forecast
       };
     });
+
+    const triggeredAlerts = openPositions
+      .filter(p => p.sell_alert_triggered)
+      .map(p => ({
+        id: p.id,
+        symbol: p.symbol,
+        original_name: p.original_name || p.symbol,
+        quantity: p.quantity,
+        buy_price: p.buy_price,
+        livePrice: p.livePrice,
+        sell_alert_price: p.sell_alert_price,
+        sell_alert_condition: p.sell_alert_condition,
+        sell_alert_return_pct: p.sell_alert_return_pct,
+        sell_alert_est_gain: p.sell_alert_est_gain,
+        unrealizedGain: p.unrealizedGain,
+        unrealizedGainPercent: p.unrealizedGainPercent,
+        daysHeld: p.daysHeld
+      }));
 
     const unrealizedGainTotal = currentPortfolioValue - totalOpenInvested;
     const unrealizedGainPercentTotal = totalOpenInvested > 0 ? (unrealizedGainTotal / totalOpenInvested) * 100 : 0;
@@ -278,8 +302,11 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
       totalRealizedGain += gain;
       if (gain > 0) winningTrades++;
 
+      const { cleanNotes: closedCleanNotes } = extractPriceAlert(row.notes || '');
+
       return {
         ...row,
+        notes: closedCleanNotes,
         quantity: parseFloat(row.quantity),
         buy_price: parseFloat(row.buy_price || 0),
         buy_total: Number(buyTotal.toFixed(2)),
@@ -354,10 +381,12 @@ app.get('/api/portfolio/summary', authenticateToken, async (req, res) => {
         concentrationAlert,
         healthStatus,
         healthColor,
+        triggeredAlertsCount: triggeredAlerts.length,
         updatedAt: new Date().toISOString()
       },
       openPositions,
       closedPositions: formattedClosedRows,
+      triggeredAlerts,
       allocation,
       news
     });
@@ -388,7 +417,7 @@ app.get('/api/transactions', authenticateToken, (req, res) => {
 // 3. Registrar una nueva Compra (BUY) para el usuario
 app.post('/api/transactions/buy', authenticateToken, (req, res) => {
   const userId = req.user.id;
-  const { symbol, original_name, buy_date, quantity, buy_price, stop_loss, notes } = req.body;
+  const { symbol, original_name, buy_date, quantity, buy_price, stop_loss, notes, sell_alert_price, sell_alert_condition } = req.body;
 
   if (!symbol || !quantity || !buy_price) {
     return res.status(400).json({ error: 'Símbolo, cantidad y precio de compra son requeridos' });
@@ -407,7 +436,9 @@ app.post('/api/transactions/buy', authenticateToken, (req, res) => {
     ) VALUES (?, ?, ?, 'BUY', ?, ?, ?, ?, ?, 'open', ?)
   `;
 
-  db.run(sql, [userId, cleanSymbol, original_name || cleanSymbol, bDate, numQty, numPrice, buyTotal, numStopLoss, notes || ''], function(err) {
+  const alertObj = sell_alert_price && parseFloat(sell_alert_price) > 0 ? { price: parseFloat(sell_alert_price), condition: sell_alert_condition || 'below' } : null;
+  const finalBuyNotes = embedPriceAlert(notes || '', alertObj);
+  db.run(sql, [userId, cleanSymbol, original_name || cleanSymbol, bDate, numQty, numPrice, buyTotal, numStopLoss, finalBuyNotes], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ message: 'Compra registrada con éxito', id: this ? this.lastID : 1 });
   });
@@ -481,7 +512,8 @@ app.post('/api/transactions/sell', authenticateToken, (req, res) => {
       WHERE id = ?
     `;
 
-    const finalNotes = notes !== undefined && notes !== null ? notes : (row.notes || '');
+    const rawNotesForSell = notes !== undefined && notes !== null ? notes : (row.notes || '');
+    const finalNotes = extractPriceAlert(rawNotesForSell).cleanNotes;
 
     db.run(sql, [sDate, sQty, sPrice, sellTotal, realizedGain, daysHeld, returnPercent, finalNotes, posId], function(err) {
       if (err) return res.status(500).json({ error: 'Error al actualizar transacción: ' + err.message });
@@ -499,7 +531,7 @@ app.post('/api/transactions/sell', authenticateToken, (req, res) => {
 // 5. Editar una transacción
 app.post('/api/transactions/edit', authenticateToken, (req, res) => {
   const userId = req.user.id;
-  const { id, buy_date, quantity, buy_price, stop_loss, notes } = req.body;
+  const { id, buy_date, quantity, buy_price, stop_loss, notes, sell_alert_price, sell_alert_condition } = req.body;
 
   if (!id || !buy_price || !quantity) {
     return res.status(400).json({ error: 'ID, precio y cantidad son requeridos' });
@@ -511,20 +543,95 @@ app.post('/api/transactions/edit', authenticateToken, (req, res) => {
   const buyTotal = numQty * numPrice;
   const numStopLoss = stop_loss ? parseFloat(stop_loss) : null;
 
-  const sql = `
-    UPDATE transactions SET
-      buy_date = ?,
-      quantity = ?,
-      buy_price = ?,
-      buy_total = ?,
-      stop_loss = ?,
-      notes = ?
-    WHERE id = ? AND user_id = ?
-  `;
+  db.get('SELECT * FROM transactions WHERE id = ?', [targetId], (findErr, existingRow) => {
+    if (findErr) return res.status(500).json({ error: findErr.message });
 
-  db.run(sql, [buy_date, numQty, numPrice, buyTotal, numStopLoss, notes || '', targetId, userId], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: 'Transacción actualizada con éxito', id: targetId });
+    const existingAlert = existingRow ? extractPriceAlert(existingRow.notes || '').sellAlert : null;
+    let finalAlert = existingAlert;
+
+    if (sell_alert_price !== undefined) {
+      const parsedAlert = (sell_alert_price !== null && String(sell_alert_price).trim() !== '')
+        ? parseFloat(String(sell_alert_price).replace(',', '.').trim())
+        : null;
+      if (parsedAlert && !isNaN(parsedAlert) && parsedAlert > 0) {
+        finalAlert = {
+          price: Number(parsedAlert.toFixed(4)),
+          condition: sell_alert_condition === 'below' ? 'below' : 'above'
+        };
+      } else {
+        finalAlert = null;
+      }
+    }
+
+    const finalNotes = embedPriceAlert(notes || '', finalAlert);
+
+    const sql = `
+      UPDATE transactions SET
+        buy_date = ?,
+        quantity = ?,
+        buy_price = ?,
+        buy_total = ?,
+        stop_loss = ?,
+        notes = ?
+      WHERE id = ? AND user_id = ?
+    `;
+
+    db.run(sql, [buy_date, numQty, numPrice, buyTotal, numStopLoss, finalNotes, targetId, userId], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ message: 'Transacción actualizada con éxito', id: targetId });
+    });
+  });
+});
+
+// 5a. Configurar o eliminar Alerta de Precio de Venta por Acción en una posición abierta
+app.post('/api/transactions/price-alert', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  let { id, alert_price, alert_condition } = req.body;
+
+  const targetId = parseInt(id);
+  if (!targetId || isNaN(targetId)) {
+    return res.status(400).json({ error: 'ID de posición abierta es requerido.' });
+  }
+
+  let parsedPrice = null;
+  if (alert_price !== undefined && alert_price !== null && String(alert_price).trim() !== '') {
+    parsedPrice = parseFloat(String(alert_price).replace(',', '.').trim());
+    if (isNaN(parsedPrice) || parsedPrice <= 0) {
+      return res.status(400).json({ error: 'Ingresa un valor por acción válido mayor a 0.' });
+    }
+  }
+
+  db.get('SELECT * FROM transactions WHERE id = ?', [targetId], (err, row) => {
+    if (err) return res.status(500).json({ error: 'Error consultando posición: ' + err.message });
+    if (!row) return res.status(404).json({ error: 'Posición no encontrada.' });
+
+    const { cleanNotes } = extractPriceAlert(row.notes || '');
+    const condition = alert_condition === 'below' ? 'below' : 'above';
+    const newAlert = parsedPrice ? { price: Number(parsedPrice.toFixed(4)), condition } : null;
+    const updatedNotes = embedPriceAlert(cleanNotes, newAlert);
+
+    db.run('UPDATE transactions SET notes = ? WHERE id = ? AND user_id = ?', [updatedNotes, targetId, userId], function(updateErr) {
+      if (updateErr) return res.status(500).json({ error: 'Error guardando alerta: ' + updateErr.message });
+
+      if (newAlert) {
+        const dirText = condition === 'above' ? 'suba a >=' : 'baje a <=';
+        return res.json({
+          message: `Alerta de venta guardada para ${row.symbol}: avisar cuando ${dirText} US$${newAlert.price.toFixed(2)}`,
+          id: targetId,
+          symbol: row.symbol,
+          sell_alert_price: Number(newAlert.price.toFixed(2)),
+          sell_alert_condition: condition
+        });
+      }
+
+      res.json({
+        message: `Alerta de precio eliminada para ${row.symbol}.`,
+        id: targetId,
+        symbol: row.symbol,
+        sell_alert_price: null,
+        sell_alert_condition: null
+      });
+    });
   });
 });
 
@@ -798,8 +905,9 @@ app.get('/api/ticker/analyze', authenticateToken, async (req, res) => {
           unrealizedGain: Number(unGain.toFixed(2)),
           unrealizedGainPercent: Number(unGainPct.toFixed(2)),
           daysHeld,
+          ...evaluatePriceAlert(extractPriceAlert(openPos.notes || '').sellAlert, livePrice, bPrice, qty),
           forecast: tickerForecast,
-          notes: openPos.notes || ''
+          notes: extractPriceAlert(openPos.notes || '').cleanNotes
         };
       } else {
         // Pronóstico táctico para entrada nueva
@@ -1141,6 +1249,7 @@ app.get('/api/export-excel', authenticateToken, (req, res) => {
       'Precio Compra US$': parseFloat(r.buy_price),
       'Inversión Total US$': parseFloat(r.buy_total),
       'Stop Loss US$': r.stop_loss || '',
+      'Alerta Venta US$': extractPriceAlert(r.notes || '').sellAlert ? extractPriceAlert(r.notes || '').sellAlert.price : '',
       'Estado': r.status === 'open' ? 'Abierta' : 'Cerrada',
       'Fecha Venta': r.sell_date || '',
       'Cantidad Vendida': r.sell_quantity || '',
@@ -1149,7 +1258,7 @@ app.get('/api/export-excel', authenticateToken, (req, res) => {
       'Ganancia Realizada US$': r.realized_gain || '',
       'Días en Cartera': r.days_held || '',
       'Rentabilidad %': r.return_percent ? `${parseFloat(r.return_percent).toFixed(2)}%` : '',
-      'Notas': r.notes || ''
+      'Notas': extractPriceAlert(r.notes || '').cleanNotes
     }));
 
     const worksheet = xlsx.utils.json_to_sheet(exportData);

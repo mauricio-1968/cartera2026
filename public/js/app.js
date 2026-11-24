@@ -6,6 +6,9 @@ const app = {
   selectedIntradaySymbol: 'LLY',
   hasInitializedChartSymbol: false,
   intradayReqId: 0,
+  currentPriceAlertPos: null,
+  notifiedAlertKeys: new Set(),
+  dismissedAlertKeys: new Set(),
 
   async init() {
     this.initTheme();
@@ -166,6 +169,7 @@ const app = {
       this.data = data;
 
       this.renderSummary(data.summary);
+      this.evaluateLivePriceAlerts(data.openPositions);
       this.renderOpenPositionsCards(data.openPositions);
       this.renderVerticalTickerList(data.openPositions);
       this.renderCharts(data.openPositions, isSilent);
@@ -433,8 +437,8 @@ const app = {
       const liveNum = pos.livePrice || pos.buy_price;
       const buyNum = parseFloat(pos.buy_price) || liveNum;
 
-      const stopVal = stopNum ? `${stopNum.toFixed(2)}` : '-';
-      const targetVal = targetNum ? `${targetNum.toFixed(2)}` : '-';
+      const stopVal = stopNum ? `$${stopNum.toFixed(2)}` : '-';
+      const targetVal = targetNum ? `$${targetNum.toFixed(2)}` : '-';
 
       // Cálculo de posición porcentual en la barra termómetro (Stop ── Compra ── Hoy ── Meta)
       const minRange = Math.min(stopNum, buyNum, liveNum) * 0.98;
@@ -455,8 +459,61 @@ const app = {
         rIcon = '🔴';
       }
 
+      const hasSellAlert = !!(pos.sell_alert_price && pos.sell_alert_price > 0);
+      const isAlertTriggered = !!pos.sell_alert_triggered;
+      const alertDirSym = pos.sell_alert_condition === 'below' ? '≤' : '≥';
+      const alertRetPct = pos.sell_alert_return_pct !== null && pos.sell_alert_return_pct !== undefined
+        ? `${pos.sell_alert_return_pct >= 0 ? '+' : ''}${Number(pos.sell_alert_return_pct).toFixed(1)}%`
+        : '';
+      const alertDistUsd = pos.sell_alert_diff_usd !== null && pos.sell_alert_diff_usd !== undefined ? Number(pos.sell_alert_diff_usd) : 0;
+      const alertDistPct = pos.sell_alert_diff_pct !== null && pos.sell_alert_diff_pct !== undefined ? Number(pos.sell_alert_diff_pct) : 0;
+      const alertDistText = pos.sell_alert_condition === 'below'
+        ? `Margen ${Math.abs(alertDistPct).toFixed(1)}% ($${Math.abs(alertDistUsd).toFixed(2)})`
+        : `Falta +$${Math.abs(alertDistUsd).toFixed(2)} (+${Math.abs(alertDistPct).toFixed(1)}%)`;
+      const minus8Preview = (buyNum * 0.92).toFixed(2);
+      const alertCardClass = isAlertTriggered ? 'card-alert-triggered' : '';
+
+      let priceAlertHtml = '';
+      if (isAlertTriggered) {
+        priceAlertHtml = `
+          <div class="holding-price-alert-box pa-triggered" onclick="event.stopPropagation()">
+            <div class="hpa-left" onclick="app.openPriceAlertModal(${pos.id})" style="cursor: pointer;">
+              <div class="hpa-title">🚨 ¡ALERTA CUMPLIDA! VENDER ${pos.symbol}</div>
+              <div class="hpa-sub">Meta: <strong>${alertDirSym} $${Number(pos.sell_alert_price).toFixed(2)}</strong> (${alertRetPct} vs compra) • Hoy: <strong>$${liveNum.toFixed(2)}</strong></div>
+            </div>
+            <div class="hpa-actions">
+              <button type="button" class="btn-pa-sell-now" onclick="app.openSellModal(${pos.id}, '${pos.symbol}', ${liveNum})">💵 Vender</button>
+              <button type="button" class="btn-pa-edit" onclick="app.openPriceAlertModal(${pos.id})" title="Editar Alerta">✏️</button>
+            </div>
+          </div>
+        `;
+      } else if (hasSellAlert) {
+        priceAlertHtml = `
+          <div class="holding-price-alert-box pa-armed" onclick="event.stopPropagation(); app.openPriceAlertModal(${pos.id})" title="Haz clic para modificar o quitar esta alerta de precio">
+            <div class="hpa-left">
+              <div class="hpa-title">🔔 Alerta Venta: <strong>${alertDirSym} $${Number(pos.sell_alert_price).toFixed(2)}</strong> <span class="hpa-ret-pill">${alertRetPct}</span></div>
+              <div class="hpa-sub">${alertDistText} para avisarte</div>
+            </div>
+            <span class="btn-pa-edit">✏️ Editar</span>
+          </div>
+        `;
+            } else {
+        priceAlertHtml = `
+          <div class="holding-price-alert-box pa-empty" onclick="event.stopPropagation()">
+            <div class="hpa-left" onclick="app.openPriceAlertModal(${pos.id})" style="cursor: pointer;" title="Haz clic para personalizar el valor de alerta">
+              <div class="hpa-title">🔔 Alerta -8% Compra: <strong>US$${minus8Preview}</strong></div>
+              <div class="hpa-sub">Compra: $${buyNum.toFixed(2)} • Hoy: $${liveNum.toFixed(2)} (Avisar si ≥ $${minus8Preview})</div>
+            </div>
+            <div class="hpa-actions" style="display:flex; gap:5px; align-items:center;">
+              <button type="button" class="btn-pa-set" onclick="app.quickSetMinus8Alert(${pos.id})" title="Activar en 1 clic alerta cuando llegue o supere -8% (US$${minus8Preview})">⚡ -8%</button>
+              <button type="button" class="btn-pa-edit" onclick="app.openPriceAlertModal(${pos.id})" title="Personalizar monto de alerta">✏️</button>
+            </div>
+          </div>
+        `;
+      }
+
       html += `
-        <div class="holding-card ${statusCardClass}" onclick="app.openTickerAnalysisModal('${pos.symbol}')">
+        <div class="holding-card ${statusCardClass} ${alertCardClass}" onclick="app.openTickerAnalysisModal('${pos.symbol}')">
           <!-- 1. CABECERA CLARA: ÍNDICE DE POSICIÓN + TICKER + PRECIO HOY -->
           <div class="holding-card-top">
             <div class="holding-avatar-info">
@@ -470,7 +527,7 @@ const app = {
               </div>
             </div>
             <div class="holding-price-badge">
-              <div class="holding-live-price">${liveNum.toFixed(2)}</div>
+              <div class="holding-live-price">$${liveNum.toFixed(2)}</div>
               <div class="holding-day-change ${dayChangeClass}">${dayChangeSign}${(pos.changePercent || 0).toFixed(2)}% hoy</div>
             </div>
           </div>
@@ -479,15 +536,15 @@ const app = {
           <div class="holding-metrics-split">
             <div class="holding-metric-col">
               <span class="holding-metric-col-label">💼 Tu Inversión <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('open_invested')" onmouseenter="app.showIndicatorTooltip(event, 'open_invested')" onmouseleave="app.hideIndicatorTooltip()">ⓘ</span></span>
-              <span class="holding-metric-col-main">${(pos.buy_total || (pos.quantity * buyNum)).toFixed(2)}</span>
-              <span class="holding-metric-col-sub">${pos.quantity} acc a <strong>${buyNum.toFixed(2)}</strong></span>
+              <span class="holding-metric-col-main">$${(pos.buy_total || (pos.quantity * buyNum)).toFixed(2)}</span>
+              <span class="holding-metric-col-sub">${pos.quantity} acc a <strong>$${buyNum.toFixed(2)}</strong></span>
             </div>
             <div class="holding-metric-col">
               <span class="holding-metric-col-label">📊 Valor & Ganancia <span class="info-help-badge" onclick="event.stopPropagation(); app.showIndicatorHelp('unrealized_gain')" onmouseenter="app.showIndicatorTooltip(event, 'unrealized_gain')" onmouseleave="app.hideIndicatorTooltip()">ⓘ</span></span>
-              <span class="holding-metric-col-main">${(pos.currentValue || 0).toFixed(2)}</span>
+              <span class="holding-metric-col-main">$${(pos.currentValue || 0).toFixed(2)}</span>
               <div>
                 <span class="holding-profit-pill ${pillClass}" style="font-size: 11.5px; padding: 2px 8px;">
-                  ${isPositive ? '▲ +' : '▼ '}${Math.abs(uGain).toFixed(2)} (${isPositive ? '+' : ''}${uPct.toFixed(2)}%)
+                  ${isPositive ? '▲ +' : '▼ '}$${Math.abs(uGain).toFixed(2)} (${isPositive ? '+' : ''}${uPct.toFixed(2)}%)
                 </span>
               </div>
             </div>
@@ -506,11 +563,14 @@ const app = {
               <div class="holding-range-marker-now" style="left: ${nowPosPct}%; border-color: ${isPositive ? 'var(--primary)' : 'var(--danger)'};" title="Precio Hoy: ${liveNum.toFixed(2)}"></div>
             </div>
             <div class="holding-range-foot">
-              <span>Compra: ${buyNum.toFixed(2)}</span>
-              <span style="font-weight: 800; color: var(--text-main);">● Hoy: ${liveNum.toFixed(2)}</span>
+              <span>Compra: $${buyNum.toFixed(2)}</span>
+              <span style="font-weight: 800; color: var(--text-main);">● Hoy: $${liveNum.toFixed(2)}</span>
               <span>Potencial: ${fc.upsidePercent >= 0 ? '+' : ''}${(fc.upsidePercent || 0).toFixed(1)}%</span>
             </div>
           </div>
+
+          <!-- 3b. ALERTA PERSONALIZADA DE PRECIO DE VENTA POR ACCIÓN -->
+          ${priceAlertHtml}
 
           <!-- 4. BANNER DE ACCIÓN EN RACIONAL PREMIUM -->
           <div class="racional-card-banner ${bannerClass}" onclick="event.stopPropagation(); app.openForecastModal(${pos.id})" title="Haz clic para ver instrucción detallada para Racional y Simulador DCA">
@@ -1541,8 +1601,20 @@ const app = {
       const maxR = Math.max(targetPrice, p.buy_price, liveNum) * 1.02;
       const pctNow = Math.min(95, Math.max(5, ((liveNum - minR) / Math.max(0.01, maxR - minR)) * 100));
 
+      const tblHasAlert = !!(p.sell_alert_price && p.sell_alert_price > 0);
+      const tblAlertTriggered = !!p.sell_alert_triggered;
+      const tblAlertSym = p.sell_alert_condition === 'below' ? '≤' : '≥';
+      const tblAlertRet = p.sell_alert_return_pct !== null && p.sell_alert_return_pct !== undefined
+        ? ` (${p.sell_alert_return_pct >= 0 ? '+' : ''}${Number(p.sell_alert_return_pct).toFixed(1)}%)`
+        : '';
+      const tblAlertBadge = tblAlertTriggered
+        ? `<div class="tbl-price-alert-pill triggered" onclick="app.openPriceAlertModal(${p.id})" title="¡Alerta cumplida! Haz clic para editar o vende ahora">🚨 ¡VENDER! ${tblAlertSym} $${Number(p.sell_alert_price).toFixed(2)}${tblAlertRet}</div>`
+        : (tblHasAlert
+          ? `<div class="tbl-price-alert-pill armed" onclick="app.openPriceAlertModal(${p.id})" title="Haz clic para editar o quitar alerta">🔔 Alerta: ${tblAlertSym} $${Number(p.sell_alert_price).toFixed(2)}${tblAlertRet}</div>`
+          : `<div style="display:flex; gap:4px; align-items:center; margin-top:5px;"><div class="tbl-price-alert-pill empty" style="margin-top:0; flex:1;" onclick="app.openPriceAlertModal(${p.id})" title="Personalizar alerta de precio (-8% = US$${(p.buy_price * 0.92).toFixed(2)})">🔔 -8%: $${(p.buy_price * 0.92).toFixed(2)}</div><button type="button" class="btn-pa-set" style="padding:2px 6px; font-size:10px;" onclick="app.quickSetMinus8Alert(${p.id})" title="Fijar en 1 clic alerta cuando llegue o supere $${(p.buy_price * 0.92).toFixed(2)}">⚡ Fijar</button></div>`);
+
       html += `
-        <tr class="${isGain ? 'row-profit' : 'row-loss'}">
+        <tr class="${isGain ? 'row-profit' : 'row-loss'} ${tblAlertTriggered ? 'row-alert-triggered' : ''}">
           <td>
             <div class="symbol-cell" onclick="app.openTickerAnalysisModal('${p.symbol}')" style="cursor: pointer;" title="Haz clic para análisis 360° de ${p.symbol}">
               <div class="symbol-avatar">${p.symbol.substring(0, 3)}</div>
@@ -1556,22 +1628,22 @@ const app = {
             </div>
           </td>
           <td>
-            <div style="font-weight: 800; color: var(--text-main); font-family: var(--font-mono);">${p.quantity} acc a ${p.buy_price.toFixed(2)}</div>
+            <div style="font-weight: 800; color: var(--text-main); font-family: var(--font-mono);">${p.quantity} acc a $${p.buy_price.toFixed(2)}</div>
             <div style="font-size: 11px; color: var(--text-muted);">📅 Compra: ${p.buy_date || '-'}</div>
           </td>
           <td>
-            <div style="font-size: 14.5px; font-weight: 800; font-family: var(--font-mono); color: var(--text-main);">${liveNum.toFixed(2)}</div>
+            <div style="font-size: 14.5px; font-weight: 800; font-family: var(--font-mono); color: var(--text-main);">$${liveNum.toFixed(2)}</div>
             <div class="${p.change >= 0 ? 'text-success' : 'text-danger'}" style="font-size: 11.5px; font-weight: 700;">
               ${p.change >= 0 ? '▲ +' : '▼ '}${p.changePercent.toFixed(2)}% hoy
             </div>
           </td>
           <td>
-            <div style="font-size: 11.5px; color: var(--text-secondary);">Invertido: <strong>${p.buy_total.toFixed(2)}</strong></div>
-            <div style="font-size: 14px; font-weight: 800; font-family: var(--font-mono); color: var(--text-main);">Hoy: ${p.currentValue.toFixed(2)}</div>
+            <div style="font-size: 11.5px; color: var(--text-secondary);">Invertido: <strong>$${p.buy_total.toFixed(2)}</strong></div>
+            <div style="font-size: 14px; font-weight: 800; font-family: var(--font-mono); color: var(--text-main);">Hoy: $${p.currentValue.toFixed(2)}</div>
           </td>
           <td>
             <div class="${isGain ? 'text-success' : 'text-danger'}" style="font-weight: 800; font-size: 14.5px; font-family: var(--font-mono);">
-              ${isGain ? '+' : ''}${p.unrealizedGain.toFixed(2)}
+              ${isGain ? '+' : ''}$${p.unrealizedGain.toFixed(2)}
             </div>
             <span class="${isGain ? 'badge-up' : 'badge-down'}" style="display: inline-block; margin-top: 3px;">
               ${isGain ? '+' : ''}${p.unrealizedGainPercent.toFixed(2)}%
@@ -1579,13 +1651,14 @@ const app = {
           </td>
           <td style="min-width: 175px;">
             <div style="display: flex; justify-content: space-between; font-size: 10.5px; font-family: var(--font-mono); font-weight: 700; margin-bottom: 4px;">
-              <span style="color: var(--danger);">🛡️ ${stopPrice.toFixed(2)}</span>
-              <span style="color: var(--primary-hover);">🎯 ${targetPrice.toFixed(2)}</span>
+              <span style="color: var(--danger);">🛡️ $${stopPrice.toFixed(2)}</span>
+              <span style="color: var(--primary-hover);">🎯 $${targetPrice.toFixed(2)}</span>
             </div>
             <div class="holding-range-track" style="height: 6px;">
               <div class="holding-range-fill" style="width: ${pctNow}%;"></div>
               <div class="holding-range-marker-now" style="left: ${pctNow}%; width: 11px; height: 11px; top: -3px;"></div>
             </div>
+            ${tblAlertBadge}
           </td>
           <td>
             <div onclick="app.openForecastModal(${p.id})" style="cursor: pointer;" title="Haz clic para ver la instrucción para Racional Premium y Simulador DCA">
@@ -1601,6 +1674,9 @@ const app = {
             <div style="display: flex; gap: 6px; justify-content: center;">
               <button class="btn btn-success" style="padding: 6px 10px; font-weight: 700; font-size: 11px;" onclick="app.openSellModal(${p.id}, '${p.symbol}', ${liveNum})">
                 💵 Vender
+              </button>
+              <button class="btn btn-secondary ${tblAlertTriggered ? 'btn-bell-triggered' : ''}" style="padding: 6px 8px; font-size: 11px;" onclick="app.openPriceAlertModal(${p.id})" title="Configurar Alerta de Precio de Venta (US$/acción)">
+                🔔
               </button>
               <button class="btn btn-secondary" style="padding: 6px 8px; font-size: 11px; color: var(--accent-blue);" onclick="app.openTickerAnalysisModal('${p.symbol}')" title="Análisis 360°">
                 🔍
@@ -3293,6 +3369,453 @@ const app = {
   closeIndicatorGuideModal() {
     const modal = document.getElementById('modal-indicator-guide');
     if (modal) modal.classList.remove('active');
+  },
+
+  // ==========================================
+  // ALERTAS DE PRECIO DE VENTA POR ACCIÓN (EN VIVO)
+  // ==========================================
+
+  evaluateLivePriceAlerts(openPositions) {
+    const list = openPositions || [];
+    const armed = list.filter(p => p.sell_alert_price && p.sell_alert_price > 0);
+    const triggered = armed.filter(p => p.sell_alert_triggered);
+
+    // Actualizar contador en el header
+    const headerBtn = document.getElementById('btn-header-alerts');
+    const headerCount = document.getElementById('header-alerts-count');
+    if (headerCount) {
+      headerCount.innerText = triggered.length > 0 ? `${triggered.length} 🚨` : `${armed.length}`;
+    }
+    if (headerBtn) {
+      if (triggered.length > 0) {
+        headerBtn.classList.add('has-triggered-alerts');
+      } else {
+        headerBtn.classList.remove('has-triggered-alerts');
+      }
+    }
+
+    // Actualizar título de pestaña del navegador si hay alertas activadas
+    const baseTitle = 'Portrack | Cartera de Acciones EE.UU. & Trading Multi-Usuario';
+    if (triggered.length > 0) {
+      const syms = triggered.map(t => t.symbol).join(', ');
+      document.title = `🚨 VENDER ${syms} | Portrack`;
+    } else {
+      document.title = baseTitle;
+    }
+
+    // Actualizar botón de permiso de notificaciones de escritorio
+    this.updateDesktopNotifButtons();
+
+    // Limpiar keys de alertas que ya no están disparadas
+    const activeTriggeredKeys = new Set(
+      triggered.map(p => `${p.id}:${Number(p.sell_alert_price).toFixed(2)}:${p.sell_alert_condition}`)
+    );
+    [...this.notifiedAlertKeys].forEach(k => {
+      if (!activeTriggeredKeys.has(k)) this.notifiedAlertKeys.delete(k);
+    });
+    [...this.dismissedAlertKeys].forEach(k => {
+      if (!activeTriggeredKeys.has(k)) this.dismissedAlertKeys.delete(k);
+    });
+
+    // Disparar sonido y notificación de escritorio solo para alertas recién cumplidas
+    let shouldRing = false;
+    triggered.forEach(pos => {
+      const alertKey = `${pos.id}:${Number(pos.sell_alert_price).toFixed(2)}:${pos.sell_alert_condition}`;
+      if (!this.notifiedAlertKeys.has(alertKey)) {
+        this.notifiedAlertKeys.add(alertKey);
+        shouldRing = true;
+        this.sendDesktopNotification(pos);
+      }
+    });
+    if (shouldRing) {
+      this.playAlertSound();
+    }
+
+    // Renderizar banner urgente superior con todas las alertas cumplidas no silenciadas
+    const banner = document.getElementById('price-alerts-banner');
+    const bannerList = document.getElementById('price-alerts-banner-list');
+    if (!banner || !bannerList) return;
+
+    const visibleTriggered = triggered.filter(p => {
+      const key = `${p.id}:${Number(p.sell_alert_price).toFixed(2)}:${p.sell_alert_condition}`;
+      return !this.dismissedAlertKeys.has(key);
+    });
+
+    if (visibleTriggered.length === 0) {
+      banner.style.display = 'none';
+      bannerList.innerHTML = '';
+      return;
+    }
+
+    banner.style.display = 'block';
+    bannerList.innerHTML = visibleTriggered.map(p => {
+      const alertKey = `${p.id}:${Number(p.sell_alert_price).toFixed(2)}:${p.sell_alert_condition}`;
+      const dirSym = p.sell_alert_condition === 'below' ? '≤' : '≥';
+      const retPct = p.sell_alert_return_pct !== null && p.sell_alert_return_pct !== undefined
+        ? `${p.sell_alert_return_pct >= 0 ? '+' : ''}${Number(p.sell_alert_return_pct).toFixed(2)}%`
+        : '';
+      const estGain = p.unrealizedGain !== undefined ? Number(p.unrealizedGain) : 0;
+      const estGainStr = `${estGain >= 0 ? '+' : '-'}$${Math.abs(estGain).toFixed(2)}`;
+      return `
+        <div class="pab-item">
+          <div class="pab-item-info">
+            <span class="pab-ticker-pill">${p.symbol}</span>
+            <div class="pab-item-text">
+              <div class="pab-item-main">
+                Precio actual: <strong>US$${Number(p.livePrice).toFixed(2)}</strong>
+                <span class="pab-sep">•</span>
+                Tu objetivo: <strong>${dirSym} US$${Number(p.sell_alert_price).toFixed(2)}</strong> (${retPct} vs compra $${Number(p.buy_price).toFixed(2)})
+              </div>
+              <div class="pab-item-sub">
+                ${p.quantity} acciones • ${p.daysHeld || 0} días en cartera • Resultado actual: <strong>${estGainStr} USD</strong>
+              </div>
+            </div>
+          </div>
+          <div class="pab-item-actions">
+            <button type="button" class="btn btn-success pab-sell-btn" onclick="app.openSellModal(${p.id}, '${p.symbol}', ${Number(p.livePrice)})">
+              💵 VENDER AHORA
+            </button>
+            <button type="button" class="btn btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="app.openPriceAlertModal(${p.id})">
+              ✏️ Cambiar
+            </button>
+            <button type="button" class="btn btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="app.dismissPriceAlert('${alertKey}')" title="Ocultar aviso temporalmente">
+              🔕 Silenciar
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  },
+
+  dismissPriceAlert(alertKey) {
+    this.dismissedAlertKeys.add(alertKey);
+    if (this.data && this.data.openPositions) {
+      this.evaluateLivePriceAlerts(this.data.openPositions);
+    }
+  },
+
+  handleHeaderAlertsClick() {
+    const openPositions = (this.data && this.data.openPositions) || [];
+    const triggered = openPositions.filter(p => p.sell_alert_triggered);
+    if (triggered.length > 0) {
+      // Re-mostrar cualquier alerta silenciada y hacer scroll al banner
+      this.dismissedAlertKeys.clear();
+      this.evaluateLivePriceAlerts(openPositions);
+      const banner = document.getElementById('price-alerts-banner');
+      if (banner) banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if (openPositions.length > 0) {
+      // Abrir modal de alerta para la posición con más días o primera abierta (ej. TSLA)
+      const sorted = [...openPositions].sort((a, b) => (b.daysHeld || 0) - (a.daysHeld || 0));
+      this.openPriceAlertModal(sorted[0].id);
+    } else {
+      alert('No tienes posiciones abiertas para configurar alertas de precio.');
+    }
+  },
+
+  openPriceAlertModal(id) {
+    const openPositions = (this.data && this.data.openPositions) || [];
+    const pos = openPositions.find(p => Number(p.id) === Number(id));
+    if (!pos) return;
+
+    this.currentPriceAlertPos = pos;
+
+    const buyPrice = parseFloat(pos.buy_price) || 0;
+    const livePrice = parseFloat(pos.livePrice) || buyPrice;
+    const qty = parseFloat(pos.quantity) || 0;
+    const buyTotal = parseFloat(pos.buy_total) || (qty * buyPrice);
+    const curPct = buyPrice > 0 ? ((livePrice - buyPrice) / buyPrice) * 100 : 0;
+
+    document.getElementById('pa-id').value = pos.id;
+    document.getElementById('pa-modal-symbol').innerText = pos.symbol;
+    document.getElementById('pa-buy-price').innerText = `$${buyPrice.toFixed(2)}`;
+    document.getElementById('pa-days-held').innerText = `${pos.daysHeld || 0} días en cartera`;
+    document.getElementById('pa-live-price').innerText = `$${livePrice.toFixed(2)}`;
+
+    const curPctEl = document.getElementById('pa-current-pct');
+    curPctEl.innerText = `${curPct >= 0 ? '+' : ''}${curPct.toFixed(2)}% hoy`;
+    curPctEl.style.color = curPct >= 0 ? 'var(--primary-hover)' : 'var(--danger)';
+
+    document.getElementById('pa-qty').innerText = `${qty}`;
+    document.getElementById('pa-invested').innerText = `Inv. $${buyTotal.toFixed(2)}`;
+
+    // Llenar etiquetas de presets según el precio de compra real de esta acción
+    const setPreset = (elId, pct) => {
+      const el = document.getElementById(elId);
+      if (el) el.innerText = `$${(buyPrice * (1 + pct / 100)).toFixed(2)}`;
+    };
+    setPreset('pa-preset-m8', -8);
+    setPreset('pa-preset-m7', -7);
+    setPreset('pa-preset-m5', -5);
+    setPreset('pa-preset-0', 0);
+    setPreset('pa-preset-p5', 5);
+    setPreset('pa-preset-p10', 10);
+
+    const priceInput = document.getElementById('pa-price');
+    const condSelect = document.getElementById('pa-condition');
+    const removeBtn = document.getElementById('pa-btn-remove');
+
+    if (pos.sell_alert_price && pos.sell_alert_price > 0) {
+      priceInput.value = Number(pos.sell_alert_price).toFixed(2);
+      condSelect.value = pos.sell_alert_condition === 'below' ? 'below' : 'above';
+      if (removeBtn) removeBtn.style.display = 'inline-flex';
+    } else {
+      // Pre-sugerir -8% sobre el precio de compra si aún no tiene alerta configurada
+      const suggested = Number((buyPrice * 0.92).toFixed(2));
+      priceInput.value = suggested.toFixed(2);
+      condSelect.value = 'above';
+      if (removeBtn) removeBtn.style.display = 'none';
+    }
+
+    this.onPriceAlertInputChange(false);
+    this.updateDesktopNotifButtons();
+    document.getElementById('modal-price-alert').classList.add('active');
+  },
+
+  closePriceAlertModal() {
+    const modal = document.getElementById('modal-price-alert');
+    if (modal) modal.classList.remove('active');
+  },
+
+  applyAlertPresetPct(pct) {
+    const pos = this.currentPriceAlertPos;
+    if (!pos) return;
+    const buyPrice = parseFloat(pos.buy_price) || 0;
+    const targetPrice = Number((buyPrice * (1 + pct / 100)).toFixed(2));
+    const priceInput = document.getElementById('pa-price');
+    if (priceInput) {
+      priceInput.value = targetPrice.toFixed(2);
+      this.onPriceAlertInputChange(true);
+    }
+  },
+
+  onPriceAlertInputChange(autoDetectCondition = false) {
+    const pos = this.currentPriceAlertPos;
+    if (!pos) return;
+
+    const buyPrice = parseFloat(pos.buy_price) || 0;
+    const livePrice = parseFloat(pos.livePrice) || buyPrice;
+    const qty = parseFloat(pos.quantity) || 0;
+
+    const rawVal = document.getElementById('pa-price')?.value || '';
+    const targetPrice = parseFloat(String(rawVal).replace(',', '.'));
+    const condSelect = document.getElementById('pa-condition');
+
+    const retEl = document.getElementById('pa-preview-return');
+    const distEl = document.getElementById('pa-preview-distance');
+    const hintEl = document.getElementById('pa-preview-hint');
+    const boxEl = document.getElementById('pa-preview-box');
+
+    if (isNaN(targetPrice) || targetPrice <= 0) {
+      if (retEl) retEl.innerText = '-';
+      if (distEl) distEl.innerText = '-';
+      if (hintEl) hintEl.innerText = 'Ingresa un valor por acción mayor a US$0.00.';
+      return;
+    }
+
+    // Auto-detectar dirección inteligente cuando el usuario escribe o presiona un preset
+    if (autoDetectCondition && condSelect) {
+      condSelect.value = targetPrice >= livePrice ? 'above' : 'below';
+    }
+
+    const condition = condSelect ? condSelect.value : (targetPrice >= livePrice ? 'above' : 'below');
+    const retPct = buyPrice > 0 ? ((targetPrice - buyPrice) / buyPrice) * 100 : 0;
+    const estGain = (targetPrice - buyPrice) * qty;
+    const totalSellUsd = targetPrice * qty;
+
+    if (retEl) {
+      const rSign = retPct >= 0 ? '+' : '';
+      const gSign = estGain >= 0 ? '+' : '-';
+      retEl.innerText = `${rSign}${retPct.toFixed(2)}% (${gSign}$${Math.abs(estGain).toFixed(2)} USD • Recibes $${totalSellUsd.toFixed(2)})`;
+      retEl.style.color = estGain >= 0 ? 'var(--primary-hover)' : 'var(--danger)';
+    }
+
+    const isTriggeredNow = condition === 'above' ? livePrice >= targetPrice : livePrice <= targetPrice;
+    const diffUsd = targetPrice - livePrice;
+    const diffPct = livePrice > 0 ? (diffUsd / livePrice) * 100 : 0;
+
+    if (distEl) {
+      if (isTriggeredNow) {
+        distEl.innerText = '🚨 ¡SE CUMPLE AHORA MISMO!';
+        distEl.style.color = 'var(--danger)';
+      } else if (condition === 'above') {
+        distEl.innerText = `Falta subir +$${Math.abs(diffUsd).toFixed(2)} (+${Math.abs(diffPct).toFixed(2)}%)`;
+        distEl.style.color = 'var(--accent-blue)';
+      } else {
+        distEl.innerText = `A -$${Math.abs(diffUsd).toFixed(2)} (-${Math.abs(diffPct).toFixed(2)}%) por debajo de hoy`;
+        distEl.style.color = 'var(--warning)';
+      }
+    }
+
+    if (hintEl) {
+      if (condition === 'above') {
+        hintEl.innerText = `📈 Te avisaremos automáticamente en cuanto ${pos.symbol} suba y toque US$${targetPrice.toFixed(2)} o más, para que vendas rápido.`;
+      } else {
+        hintEl.innerText = `📉 Te avisaremos automáticamente si ${pos.symbol} baja y toca US$${targetPrice.toFixed(2)} o menos, para proteger tu capital.`;
+      }
+    }
+
+    if (boxEl) {
+      boxEl.style.borderColor = isTriggeredNow ? 'rgba(239, 68, 68, 0.6)' : 'var(--border-color)';
+    }
+  },
+
+  async savePriceAlert(e) {
+    e.preventDefault();
+    const id = parseInt(document.getElementById('pa-id').value);
+    const alertPrice = parseFloat(String(document.getElementById('pa-price').value).replace(',', '.'));
+    const alertCondition = document.getElementById('pa-condition').value;
+
+    if (!id || isNaN(alertPrice) || alertPrice <= 0) {
+      alert('Por favor ingresa un valor por acción válido mayor a 0.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/transactions/price-alert', {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({
+          id,
+          alert_price: alertPrice,
+          alert_condition: alertCondition
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error guardando alerta');
+
+      // Permitir volver a sonar si el usuario acaba de configurar una alerta que ya se cumple
+      const newKey = `${id}:${alertPrice.toFixed(2)}:${alertCondition}`;
+      this.notifiedAlertKeys.delete(newKey);
+      this.dismissedAlertKeys.delete(newKey);
+
+      this.closePriceAlertModal();
+      await this.fetchPortfolio();
+    } catch (err) {
+      alert('Error al guardar la alerta: ' + err.message);
+    }
+  },
+
+  async removePriceAlert() {
+    const id = parseInt(document.getElementById('pa-id').value);
+    if (!id) return;
+
+    try {
+      const res = await fetch('/api/transactions/price-alert', {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({
+          id,
+          alert_price: null,
+          alert_condition: null
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error eliminando alerta');
+
+      this.closePriceAlertModal();
+      await this.fetchPortfolio();
+    } catch (err) {
+      alert('Error al quitar la alerta: ' + err.message);
+    }
+  },
+
+  playAlertSound() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+
+      const beep = (startOffset, freq, duration) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + startOffset);
+        gain.gain.setValueAtTime(0.001, now + startOffset);
+        gain.gain.exponentialRampToValueAtTime(0.22, now + startOffset + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + startOffset + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + startOffset);
+        osc.stop(now + startOffset + duration + 0.02);
+      };
+
+      // Triple tono claro y distintivo de alerta de trading
+      beep(0.0, 880, 0.16);
+      beep(0.2, 1174.66, 0.16);
+      beep(0.4, 1318.51, 0.28);
+    } catch (e) {
+      // Ignorar si el navegador bloquea audio antes de interacción
+    }
+  },
+
+  updateDesktopNotifButtons() {
+    const supported = typeof window !== 'undefined' && 'Notification' in window;
+    const perm = supported ? Notification.permission : 'unsupported';
+    const btns = [
+      document.getElementById('btn-enable-desktop-notif'),
+      document.getElementById('pa-btn-notif-perm')
+    ].filter(Boolean);
+
+    btns.forEach(btn => {
+      if (!supported) {
+        btn.style.display = 'none';
+      } else if (perm === 'granted') {
+        btn.innerText = '✅ Avisos Escritorio Activos';
+        btn.disabled = true;
+        btn.style.opacity = '0.8';
+      } else if (perm === 'denied') {
+        btn.innerText = '🔕 Bloqueado en Navegador';
+        btn.disabled = false;
+      } else {
+        btn.innerText = '🔔 Activar Avisos Escritorio';
+        btn.disabled = false;
+      }
+    });
+  },
+
+  async requestDesktopNotificationPermission() {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      alert('Tu navegador no soporta notificaciones de escritorio, pero verás el aviso visual y escucharás el sonido dentro de Portrack.');
+      return;
+    }
+    try {
+      const result = await Notification.requestPermission();
+      this.updateDesktopNotifButtons();
+      if (result === 'granted') {
+        this.playAlertSound();
+        new Notification('🔔 Alertas Portrack Activadas', {
+          body: 'Te avisaremos inmediatamente cuando alguna de tus acciones alcance tu precio objetivo de venta.'
+        });
+      }
+    } catch (e) {
+      console.error('Error solicitando permiso de notificación:', e);
+    }
+  },
+
+  sendDesktopNotification(pos) {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+
+    try {
+      const dirSym = pos.sell_alert_condition === 'below' ? '≤' : '≥';
+      const retStr = pos.sell_alert_return_pct !== null && pos.sell_alert_return_pct !== undefined
+        ? `${pos.sell_alert_return_pct >= 0 ? '+' : ''}${Number(pos.sell_alert_return_pct).toFixed(2)}%`
+        : '';
+      const notif = new Notification(`🚨 VENDER ${pos.symbol}: US$${Number(pos.livePrice).toFixed(2)}`, {
+        body: `Se cumplió tu alerta (${dirSym} US$${Number(pos.sell_alert_price).toFixed(2)} | ${retStr} vs compra). Haz clic para registrar venta.`,
+        requireInteraction: true
+      });
+      notif.onclick = () => {
+        window.focus();
+        this.openSellModal(pos.id, pos.symbol, pos.livePrice);
+        notif.close();
+      };
+    } catch (e) {
+      // Ignorar si falla notificación
+    }
   },
 
 };

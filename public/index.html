@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   
   <!-- CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=3.3.1">
+  <link rel="stylesheet" href="/css/styles.css?v=3.4.0">
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -69,6 +69,10 @@
           🔍 Analizar Ticker
         </button>
 
+        <button class="btn btn-secondary price-alert-header-btn" id="btn-header-alerts" onclick="app.handleHeaderAlertsClick()" title="Ver alertas de precio de venta activas y activar avisos de escritorio">
+          🔔 Alertas (<span id="header-alerts-count">0</span>)
+        </button>
+
         <button class="btn btn-secondary" onclick="app.refreshData()">
           <span id="refresh-spinner">🔄</span> Actualizar Precios
         </button>
@@ -84,6 +88,30 @@
 
   <!-- MAIN CONTAINER -->
   <main class="main-container">
+
+    <!-- BANNER URGENTE DE ALERTAS DE PRECIO DE VENTA ACTIVADAS -->
+    <div id="price-alerts-banner" class="price-alerts-banner" style="display: none;">
+      <div class="pab-header">
+        <div class="pab-title-wrap">
+          <span class="pab-bell-pulse">🚨</span>
+          <div>
+            <div class="pab-title">¡ALERTA DE PRECIO DE VENTA CUMPLIDA!</div>
+            <div class="pab-subtitle">Una o más de tus posiciones abiertas alcanzaron el valor por acción que configuraste para vender:</div>
+          </div>
+        </div>
+        <div class="pab-header-actions">
+          <button type="button" class="btn btn-secondary" id="btn-enable-desktop-notif" style="padding: 5px 10px; font-size: 11px;" onclick="app.requestDesktopNotificationPermission()">
+            🔔 Activar Avisos Escritorio
+          </button>
+          <button type="button" class="btn btn-secondary" style="padding: 5px 10px; font-size: 11px;" onclick="app.playAlertSound()" title="Probar sonido de alerta">
+            🔊 Sonido
+          </button>
+        </div>
+      </div>
+      <div id="price-alerts-banner-list" class="pab-list">
+        <!-- Alertas activadas renderizadas dinámicamente -->
+      </div>
+    </div>
 
     <!-- NAV TABS -->
     <nav class="nav-tabs">
@@ -183,6 +211,7 @@
             <span class="section-badge-count" id="badge-holdings-count">0 activas</span>
           </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-secondary" style="font-size: 12px; padding: 5px 12px; font-weight: 800; border-color: rgba(16, 185, 129, 0.5); color: var(--primary-hover); background: var(--primary-light);" onclick="app.applyMinus8AlertToAll()" style="font-size: 12px; padding: 5px 12px; font-weight: 800; border-color: rgba(245, 158, 11, 0.5); color: #f59e0b; background: rgba(245, 158, 11, 0.12);" title="Fijar automáticamente en todas tus posiciones abiertas la alerta al -8% del precio comprado">🔔 Fijar Alerta -8% a Todas</button>
             <button class="btn btn-secondary" style="font-size: 12px; padding: 5px 12px; font-weight: 800; border-color: rgba(16, 185, 129, 0.5); color: var(--primary-hover); background: var(--primary-light);" onclick="app.exportOpenPositionsXls()" title="Descargar informe completo de todas las posiciones abiertas en formato Excel (.xls)">
               📥 Descargar Excel (.xls)
             </button>
@@ -404,6 +433,7 @@
         <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
           <span>🟢 Posiciones Activas en Cartera (Cotizaciones en Tiempo Real)</span>
           <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button class="btn btn-secondary" onclick="app.applyMinus8AlertToAll()" style="padding: 6px 12px; font-size: 12.5px; font-weight: 800; border-color: rgba(245, 158, 11, 0.55); color: #f59e0b; background: rgba(245, 158, 11, 0.12);" title="Configurar automáticamente en todas las posiciones abiertas la alerta al -8% del precio de compra (avisar cuando llegue o supere ≥ ese monto)">🔔 Fijar Alerta -8% a Todas</button>
             <button class="btn btn-secondary" onclick="app.exportOpenPositionsXls()" style="padding: 6px 14px; font-size: 13px; font-weight: 800; border-color: rgba(16, 185, 129, 0.55); color: var(--primary-hover); background: var(--primary-light);" title="Descargar informe de todas las posiciones abiertas en formato Excel (.xls)">
               📥 Descargar Informe Excel (.xls)
             </button>
@@ -1366,7 +1396,124 @@
     </div>
   </div>
 
+  <!-- MODAL: CONFIGURAR ALERTA DE PRECIO DE VENTA POR ACCIÓN -->
+  <div class="modal-backdrop" id="modal-price-alert">
+    <div class="modal-box" style="max-width: 560px; max-height: 92vh; overflow-y: auto;">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span>🔔 Alerta de Precio de Venta</span>
+          <span class="brand-badge" id="pa-modal-symbol">TSLA</span>
+        </div>
+        <button class="modal-close" onclick="app.closePriceAlertModal()">✕</button>
+      </div>
+
+      <form onsubmit="app.savePriceAlert(event)">
+        <input type="hidden" id="pa-id">
+
+        <!-- Resumen de la Posición -->
+        <div class="pa-summary-grid">
+          <div class="pa-summary-item">
+            <span class="pa-sum-label">Precio Compra</span>
+            <strong class="pa-sum-val" id="pa-buy-price">$0.00</strong>
+            <span class="pa-sum-sub" id="pa-days-held">0 días</span>
+          </div>
+          <div class="pa-summary-item">
+            <span class="pa-sum-label">Precio Hoy (En Vivo)</span>
+            <strong class="pa-sum-val" id="pa-live-price">$0.00</strong>
+            <span class="pa-sum-sub" id="pa-current-pct">0.00%</span>
+          </div>
+          <div class="pa-summary-item">
+            <span class="pa-sum-label">Cantidad</span>
+            <strong class="pa-sum-val" id="pa-qty">0</strong>
+            <span class="pa-sum-sub" id="pa-invested">Inv. $0.00</span>
+          </div>
+        </div>
+
+        <!-- Botones Rápidos de % sobre Precio de Compra -->
+        <div style="margin-bottom: 14px;">
+          <label class="form-label" style="margin-bottom: 6px;">⚡ Calcular rápido según % sobre tu precio de compra:</label>
+          <div class="pa-preset-grid">
+            <button type="button" class="pa-preset-btn preset-loss" onclick="app.applyAlertPresetPct(-8)">
+              <strong>-8%</strong>
+              <span id="pa-preset-m8">$0.00</span>
+            </button>
+            <button type="button" class="pa-preset-btn preset-loss" onclick="app.applyAlertPresetPct(-7)">
+              <strong>-7%</strong>
+              <span id="pa-preset-m7">$0.00</span>
+            </button>
+            <button type="button" class="pa-preset-btn preset-loss" onclick="app.applyAlertPresetPct(-5)">
+              <strong>-5%</strong>
+              <span id="pa-preset-m5">$0.00</span>
+            </button>
+            <button type="button" class="pa-preset-btn preset-even" onclick="app.applyAlertPresetPct(0)">
+              <strong>0% Empate</strong>
+              <span id="pa-preset-0">$0.00</span>
+            </button>
+            <button type="button" class="pa-preset-btn preset-gain" onclick="app.applyAlertPresetPct(5)">
+              <strong>+5%</strong>
+              <span id="pa-preset-p5">$0.00</span>
+            </button>
+            <button type="button" class="pa-preset-btn preset-gain" onclick="app.applyAlertPresetPct(10)">
+              <strong>+10%</strong>
+              <span id="pa-preset-p10">$0.00</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Valor Objetivo por Acción y Condición -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">🎯 Valor por Acción para Avisar (US$)</label>
+            <input type="number" step="0.01" min="0.01" id="pa-price" class="form-input" placeholder="ej. 392.48" required oninput="app.onPriceAlertInputChange(true)" style="font-family: var(--font-mono); font-size: 16px; font-weight: 800;">
+          </div>
+          <div class="form-group">
+            <label class="form-label">📌 Condición de Disparo</label>
+            <select id="pa-condition" class="form-input" onchange="app.onPriceAlertInputChange(false)" style="font-weight: 700;">
+              <option value="above">📈 Cuando LLEGUE o SUPERE (≥) este valor</option>
+              <option value="below">📉 Cuando CAIGA a (≤) este valor</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Simulación en Vivo del Resultado al Vender a ese Precio -->
+        <div class="pa-preview-box" id="pa-preview-box">
+          <div class="pa-preview-row">
+            <span>Resultado al vender a ese precio:</span>
+            <strong id="pa-preview-return">-</strong>
+          </div>
+          <div class="pa-preview-row">
+            <span>Distancia desde precio actual:</span>
+            <strong id="pa-preview-distance">-</strong>
+          </div>
+          <div class="pa-preview-hint" id="pa-preview-hint">
+            Ingresa un valor por acción o elige -8% / -7% arriba para calcular automáticamente.
+          </div>
+        </div>
+
+        <!-- Notificaciones de Escritorio -->
+        <div class="pa-notif-bar">
+          <span style="font-size: 11.5px; color: var(--text-secondary);">
+            🔔 La app revisa los precios en vivo cada <strong>15 seg</strong> y te avisa con alerta visual, sonido y notificación.
+          </span>
+          <button type="button" class="btn btn-secondary" id="pa-btn-notif-perm" style="padding: 4px 10px; font-size: 11px; white-space: nowrap;" onclick="app.requestDesktopNotificationPermission()">
+            Permitir Notificaciones
+          </button>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-danger" id="pa-btn-remove" style="display: none; background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.45);" onclick="app.removePriceAlert()">
+            🗑️ Quitar Alerta
+          </button>
+          <div style="display: flex; gap: 10px; margin-left: auto;">
+            <button type="button" class="btn btn-secondary" onclick="app.closePriceAlertModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="font-weight: 800;">🔔 Guardar Alerta de Venta</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- JS Principal con versionado para evitar cache del navegador -->
-  <script src="/js/app.js?v=3.3.1"></script>
+  <script src="/js/app.js?v=3.4.0"></script>
 </body>
 </html>

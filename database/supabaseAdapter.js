@@ -252,9 +252,17 @@ const supabaseDb = {
         return callback.call({ lastID, changes: 1 }, null);
       }
 
-      // 2. UPDATE transactions (VENTA O EDICIÓN)
+      // 2. UPDATE transactions (VENTA, ALERTA DE PRECIO O EDICIÓN)
       if (upperSql.startsWith('UPDATE TRANSACTIONS')) {
-        if (params.length >= 14) {
+        if (upperSql.includes('SET NOTES = ?') && params.length <= 3) {
+          // Actualización rápida de alerta de precio / notas: [notes, targetId, userId?]
+          const targetId = params[1];
+          const updateData = {
+            notes: params[0] || ''
+          };
+          const res = await client.patch(`/transactions?id=eq.${targetId}`, updateData);
+          return callback.call({ changes: res.data ? res.data.length : 1 }, null);
+        } else if (params.length >= 14) {
           // Edición completa de transacción cerrada:
           // [cleanSymbol, original_name, bDate, numQty, numBuyPrice, buyTotal, sDate, numQty, numSellPrice, sellTotal, realizedGain, daysHeld, returnPercent, notes, targetId, userId?]
           const targetId = params[14];
